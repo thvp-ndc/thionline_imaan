@@ -11,6 +11,7 @@
     "test:api": "node test_day05_api_suite.mjs",
     "test:core": "node packages/vnlan-core/tests/test_grading_engine.mjs",
     "test:security": "node test_day04_cloud_security.mjs",
+    "test:sync": "node test_day08_sync_engine.mjs",
     "test:tf": "node test_tf_suite.mjs",
     "kiosk": "cd kiosk-client && npm start",
     "start": "cd server && npm start"
