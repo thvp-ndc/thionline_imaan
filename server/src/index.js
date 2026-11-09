@@ -5,6 +5,34 @@ const fs = require('node:fs');
 const cors = require('cors');
 const { Server } = require('socket.io');
 
+// --- FAIL-CLOSED MAINTENANCE LOCK GUARD ---
+// Ngăn chặn 100% việc khởi động lại ứng dụng khi đang trong khung giờ bảo trì độc quyền
+const storageConfig = require('./config/storageConfig');
+const checkLockPaths = [
+  path.resolve(__dirname, '../data/.maintenance_lock'),
+  storageConfig && storageConfig.dataDir ? path.resolve(storageConfig.dataDir, '.maintenance_lock') : null
+].filter(Boolean);
+
+for (const lockFile of checkLockPaths) {
+  if (fs.existsSync(lockFile)) {
+    try {
+      const lockData = JSON.parse(fs.readFileSync(lockFile, 'utf8'));
+      if (lockData.blockAllRestarts !== false) {
+        console.error('\n================================================================');
+        console.error('FATAL: HỆ THỐNG ĐANG TRONG KHUNG GIỜ BẢO TRÌ ĐỘC QUYỀN (.maintenance_lock)!');
+        console.error('Mọi kết nối CSDL và khởi động ứng dụng bị từ chối để bảo toàn dữ liệu.');
+        console.error('Lý do bảo trì:', lockData.reason || 'Bảo trì hệ thống');
+        console.error('Thời điểm khóa:', lockData.startedAt || 'N/A');
+        console.error('================================================================\n');
+        process.exit(53);
+      }
+    } catch (err) {
+      console.error('FATAL_LOCKDOWN_FAIL_CLOSED: Phát hiện tệp khóa nhưng không đọc được! Từ chối chạy.');
+      process.exit(53);
+    }
+  }
+}
+
 const apiRoutes = require('./routes/api');
 const { setupSocketIO } = require('./services/socketHandler');
 const { UdpDiscoveryService, getLocalIpAddress } = require('./services/udpDiscovery');
@@ -35,13 +63,10 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Serve uploaded exam images (Stored in server/uploads to prevent deletion during vite build)
-const uploadsPath = path.join(__dirname, '..', 'uploads');
-const imagesPath = path.join(uploadsPath, 'images');
-if (!fs.existsSync(imagesPath)) {
-  fs.mkdirSync(imagesPath, { recursive: true });
-}
-app.use('/uploads', express.static(uploadsPath));
+// Serve uploaded exam images (from storageConfig.uploadsDir and legacy fallback)
+app.use('/uploads/images', express.static(storageConfig.uploadsDir));
+const legacyUploadsPath = path.join(__dirname, '..', 'uploads');
+app.use('/uploads', express.static(legacyUploadsPath));
 
 // Serve static frontend assets if built
 const staticPath = path.join(__dirname, '..', 'public');
@@ -72,7 +97,7 @@ app.get('*', (req, res, next) => {
       <html lang="vi">
       <head>
         <meta charset="UTF-8">
-        <title>Hệ Thống Thi Mạng LAN - Máy Chủ Khảo Thí</title>
+        <title>VNLAN - Hệ Thống Thi Trực Tuyến Mạng LAN</title>
         <style>
           body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; padding: 40px; margin: 0; }
           .card { background: #1e293b; max-width: 800px; margin: 0 auto; border-radius: 12px; padding: 32px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid #334155; }
@@ -88,8 +113,8 @@ app.get('*', (req, res, next) => {
       </head>
       <body>
         <div class="card">
-          <span class="badge">SERVER ĐANG HOẠT ĐỘNG (ONLINE)</span>
-          <h1>Máy Chủ Thi Trực Tiếp Qua Mạng LAN</h1>
+          <span class="badge">VNLAN SERVER ĐANG HOẠT ĐỘNG (ONLINE)</span>
+          <h1>VNLAN - Hệ Thống Thi Trực Tuyến Mạng LAN</h1>
           <p>Hệ thống máy chủ đã sẵn sàng phục vụ phòng máy thi trắc nghiệm và tự luận.</p>
           <div class="info-box">
             <p>🌐 <strong>Tên miền học sinh:</strong> <code>http://${PRIMARY_DOMAIN}:${PORT}/student</code> hoặc <code>http://${PRIMARY_DOMAIN}/student</code></p>

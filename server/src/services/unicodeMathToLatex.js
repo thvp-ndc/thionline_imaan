@@ -56,6 +56,9 @@ const MATH_SYMBOLS = {
   '∥': ' \\parallel ',
   '∠': ' \\angle ',
   '°': '^{\\circ}',
+  '\u02DA': '^{\\circ}',
+  '\u00BA': '^{\\circ}',
+  '\u2218': '^{\\circ}',
   '′': "'",
   '″': "''",
   'π': ' \\pi ',
@@ -111,12 +114,24 @@ function normalizeMathString(str) {
   res = res.replace(/√\(([^)]+)\)/g, '\\sqrt{$1}');
   res = res.replace(/√([a-zA-Z0-9]+)/g, '\\sqrt{$1}');
 
+  // Bảo vệ đơn vị nhiệt độ °C / °F trong văn bản thường không bị biến thành LaTeX trần
+  res = res.replace(/\(\s*[°\u02DA\u00BA\u2218]\s*([CcFf])\s*\)/g, (m, g1) => `@@PAREN_DEG_${g1}@@`);
+  res = res.replace(/(\d+(?:[.,]\d+)?)\s*[°\u02DA\u00BA\u2218]\s*([CcFf])\b/g, (m, g1, g2) => `@@NUM_DEG_${g1}_${g2}@@`);
+
   // 4. Ký hiệu toán học
   for (const [sym, latex] of Object.entries(MATH_SYMBOLS)) {
     if (res.includes(sym)) {
       res = res.split(sym).join(latex);
     }
   }
+
+  // Khôi phục đơn vị nhiệt độ chuẩn UTF-8
+  res = res.replace(/@@PAREN_DEG_([A-Za-z])@@/g, (m, g1) => `(°${g1})`);
+  res = res.replace(/@@NUM_DEG_([0-9.,]+)_([A-Za-z])@@/g, (m, g1, g2) => `${g1}°${g2}`);
+
+  // Chuẩn hóa nếu công thức LaTeX có chứa ký hiệu độ C
+  res = res.replace(/\^\{\\circ\}\s*([Cc])\b/g, '^{\\circ}\\mathrm{C}');
+  res = res.replace(/\^\{\\circ\}\s*([Ff])\b/g, '^{\\circ}\\mathrm{F}');
 
   return res;
 }
@@ -129,7 +144,15 @@ function autoFormatMathInContent(text) {
 
   return parts.map(part => {
     if (!part) return '';
-    if (part.startsWith('`') || part.startsWith('![') || part.startsWith('$')) {
+    // Nếu là công thức inline math $...$
+    if (part.startsWith('$') && part.endsWith('$') && part.length >= 2) {
+      let mathBody = part.slice(1, -1);
+      // Chuẩn hóa nhiệt độ trong Math Mode: $20C$ hoặc $20^\circ C$ -> $20^{\circ}\mathrm{C}$
+      mathBody = mathBody.replace(/(\d+(?:[.,]\d+)?)\s*(?:\^\{\\circ\}|\^\\circ|°)?\s*C\b/g, (m, num) => `${num}^{\\circ}\\mathrm{C}`);
+      mathBody = mathBody.replace(/(\d+(?:[.,]\d+)?)\s*(?:\^\{\\circ\}|\^\\circ|°)?\s*F\b/g, (m, num) => `${num}^{\\circ}\\mathrm{F}`);
+      return `$${mathBody}$`;
+    }
+    if (part.startsWith('`') || part.startsWith('![') || part.startsWith('$$')) {
       return part;
     }
     return normalizeTextWithMathSymbols(part);

@@ -235,16 +235,17 @@ class LanDomainService {
 
   generateHtmlLauncher() {
     const info = this.getDomainInfo();
+    const targetUrl = info.studentIpUrl;
     return `<!DOCTYPE html>
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Vào Phòng Thi - ${this.primaryDomain}</title>
+  <title>VNLAN - Cổng làm bài của học sinh</title>
   <style>
     body {
-      background: #020617;
-      color: #f8fafc;
+      background: #f8fafc;
+      color: #1e293b;
       font-family: system-ui, -apple-system, sans-serif;
       display: flex;
       flex-direction: column;
@@ -257,64 +258,50 @@ class LanDomainService {
       text-align: center;
     }
     .card {
-      background: #0f172a;
-      border: 1px solid #1e293b;
-      border-radius: 16px;
-      padding: 32px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 20px;
+      padding: 36px;
       max-width: 440px;
       width: 100%;
-      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08);
     }
     .spinner {
-      width: 48px;
-      height: 48px;
-      border: 4px solid #0284c7;
+      width: 44px;
+      height: 44px;
+      border: 4px solid #2563eb;
       border-top-color: transparent;
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
       margin: 0 auto 20px;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-    h2 { margin: 0 0 8px; font-size: 20px; }
-    p { color: #94a3b8; font-size: 13px; margin: 0 0 20px; }
+    h2 { margin: 0 0 8px; font-size: 19px; color: #0f172a; font-weight: 800; }
+    p { color: #64748b; font-size: 13px; margin: 0 0 20px; line-height: 1.5; }
     .btn {
       display: inline-block;
-      background: linear-gradient(to right, #0284c7, #4f46e5);
+      background: #2563eb;
       color: #ffffff;
       text-decoration: none;
       font-weight: bold;
       padding: 12px 24px;
-      border-radius: 10px;
+      border-radius: 12px;
       font-size: 14px;
       margin-top: 10px;
+      transition: background 0.2s;
     }
+    .btn:hover { background: #1d4ed8; }
   </style>
 </head>
 <body>
   <div class="card">
     <div class="spinner"></div>
-    <h2>Đang Kết Nối Phòng Thi Trực Tuyến</h2>
-    <p>Hệ thống đang tự động tìm máy chủ giáo viên tại <b>${this.primaryDomain}</b>...</p>
-    <a id="directLink" class="btn" href="${info.studentDomainUrl}">Bấm Vào Đây Nếu Không Tự Động Chuyển Hướng</a>
+    <h2>VNLAN - Cổng làm bài của học sinh</h2>
+    <p>Đang chuyển hướng đến phòng thi tại máy chủ:<br><b style="color: #2563eb; font-family: monospace;">${targetUrl}</b>...</p>
+    <a id="directLink" class="btn" href="${targetUrl}">Bấm Vào Đây Để Vào Phòng Thi</a>
   </div>
   <script>
-    const primaryUrl = "${info.studentDomainUrl}";
-    const fallbackUrl = "${info.studentIpUrl}";
-    
-    // Tự động kiểm tra kết nối tên miền
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 1500);
-
-    fetch(primaryUrl.replace('/student', '/api/system/info'), { signal: controller.signal })
-      .then(res => res.json())
-      .then(data => {
-        clearTimeout(timeout);
-        window.location.replace(primaryUrl);
-      })
-      .catch(() => {
-        clearTimeout(timeout);
-        window.location.replace(fallbackUrl);
-      });
+    window.location.replace("${targetUrl}");
   </script>
 </body>
 </html>`;

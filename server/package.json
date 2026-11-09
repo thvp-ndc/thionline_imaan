@@ -9,9 +9,11 @@
     "dev": "node --watch src/index.js"
   },
   "dependencies": {
+    "bytenode": "^1.7.0",
     "cors": "^2.8.5",
     "express": "^4.21.2",
     "mammoth": "^1.12.2",
+    "sanitize-html": "^2.18.1",
     "socket.io": "^4.8.1",
     "xlsx": "^0.18.5"
   }

@@ -30,6 +30,10 @@ function parseOMMLNode(node) {
       }
       let mathStr = mathParts.join('').trim();
       mathStr = mathStr.replace(/\s+/g, ' ');
+      // Chuẩn hóa nếu công thức là giá trị nhiệt độ (như 20C hoặc 20^\circ C -> 20^{\circ}\mathrm{C})
+      mathStr = mathStr.replace(/^(\d+(?:[.,]\d+)?)\s*C$/i, '$1^{\\circ}\\mathrm{C}');
+      mathStr = mathStr.replace(/^(\d+(?:[.,]\d+)?)\s*\^\{\\circ\}\s*C$/i, '$1^{\\circ}\\mathrm{C}');
+      mathStr = mathStr.replace(/^(\d+(?:[.,]\d+)?)\s*\^\\circ\s*C$/i, '$1^{\\circ}\\mathrm{C}');
       return mathStr ? `$${mathStr}$` : '';
     }
 
@@ -407,7 +411,9 @@ function cleanMathText(text) {
     .replace(/\u22A5/g, ' \\perp ')
     .replace(/\u2225/g, ' \\parallel ')
     .replace(/\u2220/g, ' \\angle ')
-    .replace(/\u00B0/g, '^{\\circ}')
+    .replace(/[\u00B0\u02DA\u00BA\u2218]/g, '^{\\circ}')
+    .replace(/\^\{\\circ\}\s*([Cc])\b/g, '^{\\circ}\\mathrm{C}')
+    .replace(/\^\{\\circ\}\s*([Ff])\b/g, '^{\\circ}\\mathrm{F}')
     .replace(/\u2032/g, "'")
     .replace(/\u2033/g, "''")
     .replace(/\u03C0/g, ' \\pi ')

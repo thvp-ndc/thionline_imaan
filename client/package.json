@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build --outDir ../server/public --emptyOutDir",
-    "build:cloud": "vite build --outDir dist --emptyOutDir",
+    "build:cloud": "vite build --outDir dist --emptyOutDir && node -e \"import('node:fs').then(fs => fs.copyFileSync('dist/index.html', 'dist/404.html'))\"",
     "preview": "vite preview"
   },
   "dependencies": {

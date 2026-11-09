@@ -1,13 +1,15 @@
 /**
  * wmfUtils.js
  * Module xử lý định dạng tệp MathType và Windows Metafile (WMF / EMF):
- * 1. Giải mã MathType Equation Format (MTEF v3, v5) từ luồng nhị phân OLE (oleObject*.bin) sang KaTeX LaTeX ($...$).
- * 2. Trích xuất MTEF từ Windows Metafile (WMF comment records 0x1B).
- * 3. Chuyển đổi tệp ảnh WMF vector/bitmap (đồ thị, hình vẽ hình học) sang định dạng hiển thị web chính xác.
+ * 1. Giải mã MathType Equation Format (MTEF v3, v5) từ luồng nhị phân OLE (oleObject*.bin) và ảnh WMF sang KaTeX LaTeX ($...$).
+ * 2. Trích xuất trực tiếp chuỗi 'TeX Input Language' siêu chuẩn của MathType 6/7.
+ * 3. Chuyển đổi tệp ảnh WMF vector/bitmap (đồ thị, hình vẽ hình học) sang PNG độ phân giải cao hoặc BMP/SVG cho web.
  */
 
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
+const { execFileSync } = require('node:child_process');
 
 const GREEK_MAP = {
   0x03B1: '\\alpha', 0x03B2: '\\beta', 0x03B3: '\\gamma', 0x03B4: '\\delta', 0x03B5: '\\epsilon',
@@ -138,10 +140,84 @@ function extractOleStream(buffer, targetName) {
 }
 
 /**
+ * Trích xuất và chuẩn hóa chuỗi TeX Input Language từ MathType (OLE Equation Native hoặc WMF header)
+ */
+function extractTexFromStream(buffer) {
+  if (!buffer || buffer.length < 25) return null;
+  const marker = Buffer.from('TeX Input Language');
+  const idx = buffer.indexOf(marker);
+  if (idx === -1) return null;
+
+  let p = idx + marker.length;
+  // Bỏ qua các byte null hoặc khoảng trắng đầu
+  while (p < buffer.length && (buffer[p] === 0 || buffer[p] === 10 || buffer[p] === 13 || buffer[p] === 32)) {
+    p++;
+  }
+  let end = p;
+  while (end < buffer.length && buffer[end] !== 0) {
+    end++;
+  }
+  if (end <= p) return null;
+
+  let str = buffer.toString('utf8', p, end).trim();
+  if (!str) return null;
+
+  // 1. MathType ~ (dấu cách không ngắt / đơn vị): {600 {~kg}} -> 600\text{ kg}
+  str = str.replace(/\{\s*~([a-zA-Z]+)\s*\}/g, '\\text{ $1}');
+  str = str.replace(/~\s*([a-zA-Z]+)/g, '\\text{ $1}');
+  str = str.replace(/~/g, '\\, ');
+
+  // 2. Vector: \overrightarrow{A B} -> \overrightarrow{AB}
+  str = str.replace(/\\overrightarrow\{\s*([A-Za-z]+)\s+([A-Za-z]+)\s*\}/g, '\\overrightarrow{$1$2}');
+  str = str.replace(/\\vec\{\s*([A-Za-z]+)\s+([A-Za-z]+)\s*\}/g, '\\vec{$1$2}');
+
+  // 3. Điểm / Đoạn thẳng / Tam giác: {A B C} -> ABC, {A B} -> AB
+  str = str.replace(/\{([A-Z])\s+([A-Z])\s+([A-Z])\}/g, '$1$2$3');
+  str = str.replace(/\{([A-Z])\s+([A-Z])\}/g, '$1$2');
+  str = str.replace(/\b([A-Z])\s+([A-Z])\b/g, '$1$2');
+
+  // 4. Đơn vị micromet / nanomet: \mu {m} -> \mu\text{m}
+  str = str.replace(/\\mu\s*\{m\}/g, '\\mu\\text{m}');
+  str = str.replace(/\\mu\s+m\b/g, '\\mu\\text{m}');
+
+  // 5. Loại bỏ cặp ngoặc ngoài cùng { ... } nếu bao trùm toàn bộ
+  if (str.startsWith('{') && str.endsWith('}')) {
+    let depth = 0;
+    let canUnwrap = true;
+    for (let i = 0; i < str.length - 1; i++) {
+      if (str[i] === '{') depth++;
+      else if (str[i] === '}') depth--;
+      if (depth === 0) {
+        canUnwrap = false;
+        break;
+      }
+    }
+    if (canUnwrap) {
+      str = str.substring(1, str.length - 1).trim();
+    }
+  }
+
+  // 6. Vector sau khi un-wrap
+  str = str.replace(/\\overrightarrow\{\s*([A-Za-z]+)\s+([A-Za-z]+)\s*\}/g, '\\overrightarrow{$1$2}');
+
+  // 7. Chuẩn hóa hàm lượng giác và toán học sang lệnh KaTeX
+  str = str.replace(/\b(sin|cos|tan|cot|arcsin|arccos|arctan|ln|log|lim|max|min|det)\b/g, '\\$1');
+
+  str = str.replace(/\s+/g, ' ').replace(/\s+([.,;:])/g, '$1');
+  return str.trim();
+}
+
+/**
  * Giải mã luồng MTEF v3, v4, v5 sang KaTeX LaTeX
  */
 function parseMtefStreamToLatex(buffer) {
   if (!buffer || buffer.length < 5) return null;
+
+  // 0. Ưu tiên kiểm tra chuỗi TeX Input Language có sẵn trong luồng
+  const texDirect = extractTexFromStream(buffer);
+  if (texDirect && texDirect.length > 0) {
+    return texDirect;
+  }
 
   try {
     let offset = 0;
@@ -255,7 +331,14 @@ function parseMtefStreamToLatex(buffer) {
 
         if (tag === 1 || tag === 0x0A) {
           if (buffer[offset] === 0x00) offset++;
-          out += parseStream(depth + 1);
+          const lineRes = parseStream(depth + 1);
+          if (lineRes && lineRes.trim()) {
+            const trimmedOut = out.trim();
+            if (trimmedOut.length > 0 && !trimmedOut.endsWith('\\\\')) {
+              out += ' \\\\ ';
+            }
+            out += lineRes;
+          }
         } else if (tag === 2) { // CHAR
           out += parseChar();
         } else if (tag === 3) { // TMPL
@@ -272,7 +355,9 @@ function parseMtefStreamToLatex(buffer) {
           } else if (sel === 0 || sel === 10) { // Parenthesis / Fence
             let inner = parseSlot(depth + 1);
             inner = inner.replace(/\\left\(|\\right\)/g, '').replace(/\(\s*\)/g, '').trim();
-            if (inner.startsWith('(') && inner.endsWith(')')) {
+            if (inner.includes('\\\\')) {
+              out += `\\begin{cases} ${inner} \\end{cases}`;
+            } else if (inner.startsWith('(') && inner.endsWith(')')) {
               out += inner;
             } else {
               out += `(${inner})`;
@@ -287,7 +372,7 @@ function parseMtefStreamToLatex(buffer) {
             }
           } else if (sel === 9) { // Cases / Brace { ... }
             let inner = parseSlot(depth + 1);
-            out += `\\{${inner}\\}`;
+            out += inner.includes('\\\\') ? `\\begin{cases} ${inner} \\end{cases}` : `\\{${inner}\\}`;
           } else if (sel === 11) { // Bar | ... |
             let inner = parseSlot(depth + 1);
             out += `|${inner}|`;
@@ -305,10 +390,15 @@ function parseMtefStreamToLatex(buffer) {
           while (offset < buffer.length && pileSteps++ < 20) {
             if (buffer[offset] === 0) { offset++; break; }
             const prevOff = offset;
-            lines.push(parseSlot(depth + 1));
+            const l = parseSlot(depth + 1);
+            if (l && l.trim()) lines.push(l.trim());
             if (offset === prevOff) offset++;
           }
-          out += lines.length > 1 ? `\\begin{cases} ${lines.join(' \\\\ ')} \\end{cases}` : (lines[0] || '');
+          if (lines.length > 1) {
+            out += lines.join(' \\\\ ');
+          } else if (lines.length === 1) {
+            out += lines[0];
+          }
         } else if (tag === 5) { // MATRIX
           const rows = Math.min(readByte() || 2, 10);
           const cols = Math.min(readByte() || 2, 10);
@@ -336,8 +426,22 @@ function parseMtefStreamToLatex(buffer) {
     // Chuẩn hóa và làm sạch cấu trúc toán học
     latex = latex.replace(/\(\s*\)/g, '');
     latex = latex.replace(/\[\s*\]/g, '');
+    latex = latex.replace(/\{\s*\}/g, '');
     latex = latex.replace(/\(\(([^()]+)\)\)/g, '($1)');
     latex = latex.replace(/\[\[([^\[\]]+)\]\]/g, '[$1]');
+    latex = latex.replace(/\{\s*\.\s*$/g, '').trim();
+
+    // Dọn dẹp khoảng trống và dấu ngoặc khi có đa dòng
+    if (latex.includes('\\\\')) {
+      latex = latex.replace(/\{\s*$/g, '').replace(/^\s*\{/g, '').trim();
+      latex = latex.replace(/^\s*\\\\\s*/, '').replace(/\\\\\s*$/, '');
+      if (!latex.includes('\\begin{cases}')) {
+        latex = `\\begin{cases} ${latex} \\end{cases}`;
+      }
+    }
+
+    // Bỏ dấu \\ thừa ở đầu cases
+    latex = latex.replace(/\\begin\{cases\}\s*\\\\\s*/g, '\\begin{cases} ');
 
     // Chuẩn hóa ngoặc đôi trong tọa độ e.g. ((- \frac{1}{2}); 9) -> (-\frac{1}{2}; 9)
     latex = latex.replace(/\(\(([^()]+)\)\s*;\s*([^()]+)\)/g, '($1; $2)');
@@ -350,6 +454,10 @@ function parseMtefStreamToLatex(buffer) {
     latex = latex.replace(/\(([^()\[\]]+)\s*\(\s*\]/g, '($1]');
     latex = latex.replace(/\(([^()\[\]]+)\s*\[\s*\)/g, '[$1)');
     latex = latex.replace(/\(([^()\[\]]+)\s*\[\s*\]/g, '[$1]');
+
+    // Chuẩn hóa dấu âm liền kề số: - 3 -> -3 sau dấu = / ( / > / < / ; / \le / \ge / \\
+    latex = latex.replace(/([=(><;]|\\le|\\ge|\\\\)\s*-\s+(\d+)/g, '$1 -$2');
+    latex = latex.replace(/^-\s+(\d+)/g, '-$1');
 
     // Tự động chuẩn hóa hàm lượng giác và toán học sang lệnh LaTeX KaTeX
     latex = latex.replace(/\b(sin|cos|tan|cot|arcsin|arccos|arctan|ln|log|lim|max|min|det)\b/g, '\\$1');
@@ -383,13 +491,31 @@ function extractMathTypeToLatex(buffer) {
     if (buffer.length >= 512 && buffer.readUInt32LE(0) === 0xe011cfd0) {
       const stream = extractOleStream(buffer, 'Equation Native');
       if (stream) {
+        const tex = extractTexFromStream(stream);
+        if (tex && tex.length > 0) return `$${tex}$`;
         const latex = parseMtefStreamToLatex(stream);
         if (latex && latex.length > 0) return `$${latex}$`;
       }
+      // Quét trực tiếp toàn bộ OLE buffer nếu extractOleStream không thấy
+      const directTex = extractTexFromStream(buffer);
+      if (directTex && directTex.length > 0) return `$${directTex}$`;
       return null;
     }
 
-    // 2. Kiểm tra nếu luồng bắt đầu trực tiếp bằng chữ ký MTEF (0x05 0x01, 0x03 0x01)
+    // 2. Kiểm tra nếu buffer có chứa chuỗi TeX Input Language (kể cả trong WMF)
+    const directTex = extractTexFromStream(buffer);
+    if (directTex && directTex.length > 0) {
+      return `$${directTex}$`;
+    }
+
+    // 3. Kiểm tra tệp WMF chứa MathType comment records 'DSMT' (header MTEF Windows)
+    const dsmtPos = buffer.indexOf(Buffer.from('DSMT'));
+    if (dsmtPos >= 5) {
+      const latex = parseMtefStreamToLatex(buffer.slice(dsmtPos - 5));
+      if (latex && latex.length > 0) return `$${latex}$`;
+    }
+
+    // 4. Kiểm tra nếu luồng bắt đầu trực tiếp bằng chữ ký MTEF (0x05 0x01, 0x03 0x01)
     if (
       (buffer[0] === 0x05 && buffer[1] === 0x01) ||
       (buffer[0] === 0x03 && buffer[1] === 0x01) ||
@@ -399,10 +525,13 @@ function extractMathTypeToLatex(buffer) {
       if (rawLatex && rawLatex.length > 0) return `$${rawLatex}$`;
     }
 
-    // 3. Kiểm tra tệp WMF chứa MathType comment records (quét nhanh trong header 2048 byte đầu)
-    const scanLimit = Math.min(buffer.length - 8, 2048);
+    // 5. Kiểm tra tệp WMF chứa MathType comment records (quét header hoặc toàn bộ buffer)
+    const scanLimit = Math.min(buffer.length - 4, 4096);
     for (let i = 0; i < scanLimit; i++) {
-      if (buffer[i] === 0x1B && (buffer[i + 1] === 0x03 || buffer[i + 1] === 0x05 || buffer[i + 1] === 0x01)) {
+      if ((buffer[i] === 0x05 || buffer[i] === 0x03) && buffer[i + 1] === 0x01) {
+        const latex = parseMtefStreamToLatex(buffer.slice(i));
+        if (latex && latex.length > 0) return `$${latex}$`;
+      } else if (buffer[i] === 0x1B && (buffer[i + 1] === 0x03 || buffer[i + 1] === 0x05 || buffer[i + 1] === 0x01)) {
         const latex = parseMtefStreamToLatex(buffer.slice(i));
         if (latex && latex.length > 0) return `$${latex}$`;
       }
@@ -411,6 +540,61 @@ function extractMathTypeToLatex(buffer) {
     // ignore
   }
 
+  return null;
+}
+
+/**
+ * Chuyển đổi tệp ảnh WMF vector sang PNG bằng Windows GDI+
+ */
+function convertWmfToPngWithGdi(wmfBuffer) {
+  if (process.platform !== 'win32' || !wmfBuffer || wmfBuffer.length < 40) return null;
+  const tmpDir = os.tmpdir();
+  const tmpWmf = path.join(tmpDir, `wmf_${Date.now()}_${Math.random().toString(36).substring(7)}.wmf`);
+  const tmpPng = path.join(tmpDir, `png_${Date.now()}_${Math.random().toString(36).substring(7)}.png`);
+
+  try {
+    fs.writeFileSync(tmpWmf, wmfBuffer);
+    const psScript = `
+      Add-Type -AssemblyName System.Drawing
+      try {
+        $img = [System.Drawing.Imaging.Metafile]::new('${tmpWmf.replace(/\\/g, '/')}')
+        $w = [Math]::Max(100, [Math]::Min(3000, [int]$img.Width))
+        $h = [Math]::Max(100, [Math]::Min(3000, [int]$img.Height))
+        $bmp = New-Object System.Drawing.Bitmap($w, $h)
+        $g = [System.Drawing.Graphics]::FromImage($bmp)
+        $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+        $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+        $g.Clear([System.Drawing.Color]::White)
+        $g.DrawImage($img, 0, 0, $w, $h)
+        $bmp.Save('${tmpPng.replace(/\\/g, '/')}', [System.Drawing.Imaging.ImageFormat]::Png)
+        $g.Dispose()
+        $bmp.Dispose()
+        $img.Dispose()
+        Write-Output "OK:\${w}:\${h}"
+      } catch {
+        Write-Output "ERR:$($_.Exception.Message)"
+      }
+    `;
+
+    const out = execFileSync('powershell', ['-NoProfile', '-Command', psScript], {
+      timeout: 5000,
+      encoding: 'utf8',
+      windowsHide: true
+    }).trim();
+
+    if (out.startsWith('OK:') && fs.existsSync(tmpPng)) {
+      const parts = out.split(':');
+      const width = parseInt(parts[1], 10) || 400;
+      const height = parseInt(parts[2], 10) || 250;
+      const pngBuffer = fs.readFileSync(tmpPng);
+      return { buffer: pngBuffer, ext: 'png', width, height };
+    }
+  } catch (err) {
+    // fallback
+  } finally {
+    try { if (fs.existsSync(tmpWmf)) fs.unlinkSync(tmpWmf); } catch (e) {}
+    try { if (fs.existsSync(tmpPng)) fs.unlinkSync(tmpPng); } catch (e) {}
+  }
   return null;
 }
 
@@ -450,7 +634,13 @@ function convertWmfToWebImage(wmfBuffer) {
       }
     }
 
-    // 2. Vector WMF: Xác định kích thước từ Placeable Header (0x9AC6CDD7)
+    // 2. Vector WMF: Render sang PNG sắc nét bằng Windows GDI+
+    if (process.platform === 'win32') {
+      const gdiRes = convertWmfToPngWithGdi(wmfBuffer);
+      if (gdiRes) return gdiRes;
+    }
+
+    // 3. Fallback: Kích thước từ Placeable Header (0x9AC6CDD7)
     let width = 400;
     let height = 250;
     if (wmfBuffer.readUInt32LE(0) === 0x9AC6CDD7) {
@@ -485,6 +675,6 @@ module.exports = {
   extractMathTypeToLatex,
   parseMtefStreamToLatex,
   extractOleStream,
+  extractTexFromStream,
   convertWmfToWebImage
 };
-

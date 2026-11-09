@@ -53,3 +53,27 @@ Hệ thống đã được nâng cấp toàn diện để đáp ứng 100% quy c
 3. **Nhập đề vào hệ thống**:
    - Bấm **"Nhập Đề Từ File Word (.docx)"** và chọn file Word của bạn.
    - Hệ thống sẽ tự động bóc tách và tạo đề thi chỉ trong 1 giây!
+
+---
+
+## 4. Ứng Dụng Độc Lập: Soạn & Trộn Đề Thi Word Chuẩn In Ấn Khảo Thí (`tools/App_TronDe_Word`)
+
+Đã hoàn thành xây dựng và kiểm thử thành công ứng dụng độc lập chuyên biệt để soạn và trộn đề thi từ file Word:
+- **Độc lập 100%**: Đặt tại [`tools/App_TronDe_Word/`](file:///d:/Kiemtraqualan/tools/App_TronDe_Word), khởi động bằng file 1-click [`KhoiDong_App_TronDe.bat`](file:///d:/Kiemtraqualan/KhoiDong_App_TronDe.bat) hoặc [`tools/App_TronDe_Word/KhoiDong_App_TronDe.bat`](file:///d:/Kiemtraqualan/tools/App_TronDe_Word/KhoiDong_App_TronDe.bat).
+- **Quy chuẩn in ấn**:
+  - Phông chữ: `Times New Roman`, Cỡ chữ: `12 pt`, Dãn dòng: `Single`, Dãn đoạn: `0 pt`.
+  - Khổ giấy: `A4`, Lề trang: Đúng `1.0 cm` (567 dxa) cho cả 4 lề.
+  - **Màu sắc & Bảo mật in**: Ép toàn bộ về **Màu Đen Chuẩn (#000000 / Auto)**, tự động xóa sạch vết đáp án (gạch chân, dấu hoa thị, [Đ]/[S]) trên đề thi học sinh.
+  - **Chân trang (Footer)**: `Mã đề: [xxx] - Trang {PAGE}/{NUMPAGES}` tự động nhảy số trang khi in.
+  - Tự động nhận diện độ dài phương án để dàn trang tiết kiệm giấy in (1 dòng 4 cột, 2 dòng 2 cột, hoặc 4 dòng).
+  - Xuất riêng 1 file Word Bảng đáp án ma trận các mã đề (`Bang_Dap_An_Cac_Ma_De.docx`) phục vụ giáo viên soi chấm.
+- **Hỗ trợ toàn diện 4 Dạng câu hỏi (Chuẩn BGDĐT 2025)**:
+  - Dạng 1: Trắc nghiệm 4 lựa chọn (A, B, C, D).
+  - Dạng 2: Trắc nghiệm Đúng / Sai (4 ý a, b, c, d).
+  - Dạng 3: Trắc nghiệm Trả lời ngắn (điền kết quả trên phiếu riêng, đề thi KHÔNG in ô điền).
+  - Dạng 4: Tự luận kèm thang điểm và barem chi tiết.
+- **Trình Chỉnh Sửa Trực Quan (Interactive Exam Editor)**: Cho phép sửa nội dung câu hỏi, đổi đáp án đúng 1-click, đổi Đúng/Sai, lưu thay đổi trước khi trộn và xuất file Word đề gốc đã chỉnh sửa.
+- **Kiểm định khảo thí tự động (Pre-flight Exam Inspector)**: Phát hiện trùng câu hỏi, trùng đáp án trong 1 câu, câu thiếu key đáp án, câu thiếu phương án trước khi xuất bản in.
+- **Xuất File Mẫu Chuẩn (`/api/download-template`)**: Nút tải file Word mẫu chuẩn 4 dạng ngay trên giao diện web.
+
+
