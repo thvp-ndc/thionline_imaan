@@ -5,8 +5,8 @@
  * - Chỉ mở khóa chi tiết câu đúng/sai khi cho phép (allow_review)
  */
 
-import { getSupabaseServerClient } from './lib/supabaseClient.js';
-import { verifyJWT } from './lib/security.js';
+import { getSupabaseServerClient } from './_lib/supabaseClient.js';
+import { verifyJWT } from './_lib/security.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {

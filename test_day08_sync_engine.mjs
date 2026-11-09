@@ -1,8 +1,10 @@
 import assert from 'node:assert';
-import pushHandler from './api/sync/push.js';
-import pullHandler from './api/sync/pull.js';
-import ackHandler from './api/sync/ack.js';
-import { signJWT } from './api/lib/security.js';
+import syncHandler from './api/sync.js';
+import { signJWT } from './api/_lib/security.js';
+
+const pushHandler = (req, res) => { req.query = { ...req.query, action: 'push' }; return syncHandler(req, res); };
+const pullHandler = (req, res) => { req.query = { ...req.query, action: 'pull' }; return syncHandler(req, res); };
+const ackHandler = (req, res) => { req.query = { ...req.query, action: 'ack' }; return syncHandler(req, res); };
 
 console.log('================================================================');
 console.log('  BỘ KIỂM THỬ ĐỘNG CƠ ĐỒNG BỘ 3 BƯỚC NGÀY 8 (SYNC PROTOCOL)     ');

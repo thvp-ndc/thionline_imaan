@@ -6,7 +6,7 @@ import {
   calculatePayloadHash,
   signJWT,
   verifyJWT
-} from './api/lib/security.js';
+} from './api/_lib/security.js';
 
 console.log('================================================================');
 console.log('  KIỂM THỬ TIÊU CHUẨN BẢO MẬT NGÀY 4: CLOUD AUTH & CRYPTO       ');

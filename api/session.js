@@ -6,8 +6,8 @@
  * - Kiểm tra phiên thi và thời hạn làm bài của học sinh
  */
 
-import { getSupabaseServerClient } from './lib/supabaseClient.js';
-import { verifyJWT } from './lib/security.js';
+import { getSupabaseServerClient } from './_lib/supabaseClient.js';
+import { verifyJWT } from './_lib/security.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {

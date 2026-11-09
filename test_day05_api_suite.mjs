@@ -1,10 +1,12 @@
 import assert from 'node:assert';
-import teacherAuthHandler from './api/auth/teacher.js';
-import studentAuthHandler from './api/auth/student.js';
+import authHandler from './api/auth.js';
 import sessionHandler from './api/session.js';
 import submitHandler from './api/submit.js';
 import heartbeatHandler from './api/heartbeat.js';
-import { hashAccessCode, signJWT } from './api/lib/security.js';
+import { hashAccessCode, signJWT } from './api/_lib/security.js';
+
+const teacherAuthHandler = (req, res) => { req.query = { ...req.query, action: 'teacher' }; return authHandler(req, res); };
+const studentAuthHandler = (req, res) => { req.query = { ...req.query, action: 'student' }; return authHandler(req, res); };
 
 console.log('================================================================');
 console.log('  BỘ KIỂM THỬ TÍCH HỢP TOÀN DIỆN CÁC API NGÀY 5 (VERCEL API)     ');

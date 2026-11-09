@@ -7,8 +7,8 @@
  * - Ghi bản ghi bài nộp bất biến (Immutable Submission)
  */
 
-import { getSupabaseServerClient } from './lib/supabaseClient.js';
-import { verifyJWT, calculatePayloadHash } from './lib/security.js';
+import { getSupabaseServerClient } from './_lib/supabaseClient.js';
+import { verifyJWT, calculatePayloadHash } from './_lib/security.js';
 import { gradeSubmission } from '../packages/vnlan-core/src/index.js';
 
 export default async function handler(req, res) {

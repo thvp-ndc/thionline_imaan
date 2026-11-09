@@ -18,16 +18,19 @@ import {
   generateDeviceToken, 
   hashToken, 
   calculatePayloadHash 
-} from './api/lib/security.js';
+} from './api/_lib/security.js';
 
-import teacherAuthHandler from './api/auth/teacher.js';
-import studentAuthHandler from './api/auth/student.js';
+import authHandler from './api/auth.js';
 import sessionHandler from './api/session.js';
 import submitHandler from './api/submit.js';
 import heartbeatHandler from './api/heartbeat.js';
-import pushHandler from './api/sync/push.js';
-import pullHandler from './api/sync/pull.js';
-import ackHandler from './api/sync/ack.js';
+import syncHandler from './api/sync.js';
+
+const teacherAuthHandler = (req, res) => { req.query = { ...req.query, action: 'teacher' }; return authHandler(req, res); };
+const studentAuthHandler = (req, res) => { req.query = { ...req.query, action: 'student' }; return authHandler(req, res); };
+const pushHandler = (req, res) => { req.query = { ...req.query, action: 'push' }; return syncHandler(req, res); };
+const pullHandler = (req, res) => { req.query = { ...req.query, action: 'pull' }; return syncHandler(req, res); };
+const ackHandler = (req, res) => { req.query = { ...req.query, action: 'ack' }; return syncHandler(req, res); };
 import cloudSyncPkg from './server/src/services/cloudSyncService.js';
 const { CloudSyncService } = cloudSyncPkg;
 

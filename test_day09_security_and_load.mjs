@@ -1,10 +1,12 @@
 import assert from 'node:assert';
 import sessionHandler from './api/session.js';
 import submitHandler from './api/submit.js';
-import pushHandler from './api/sync/push.js';
-import pullHandler from './api/sync/pull.js';
-import { signJWT, calculatePayloadHash } from './api/lib/security.js';
+import syncHandler from './api/sync.js';
+import { signJWT, calculatePayloadHash } from './api/_lib/security.js';
 import { gradeSubmission } from './packages/vnlan-core/src/index.js';
+
+const pushHandler = (req, res) => { req.query = { ...req.query, action: 'push' }; return syncHandler(req, res); };
+const pullHandler = (req, res) => { req.query = { ...req.query, action: 'pull' }; return syncHandler(req, res); };
 
 console.log('================================================================');
 console.log('  BỘ KIỂM THỬ THÂM NHẬP BẢO MẬT & THỬ TẢI ĐỒNG THỜI NGÀY 9     ');

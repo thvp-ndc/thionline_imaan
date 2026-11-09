@@ -6,8 +6,8 @@
  * - Lưu tạm delta câu trả lời để phòng chống mất bài
  */
 
-import { getSupabaseServerClient } from './lib/supabaseClient.js';
-import { verifyJWT } from './lib/security.js';
+import { getSupabaseServerClient } from './_lib/supabaseClient.js';
+import { verifyJWT } from './_lib/security.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {

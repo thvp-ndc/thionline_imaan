@@ -6,6 +6,18 @@
   "outputDirectory": "client/dist",
   "rewrites": [
     {
+      "source": "/api/auth/:path*",
+      "destination": "/api/auth?action=:path*"
+    },
+    {
+      "source": "/api/sync/:path*",
+      "destination": "/api/sync?action=:path*"
+    },
+    {
+      "source": "/api/system/:path*",
+      "destination": "/api/auth?action=system-info"
+    },
+    {
       "source": "/((?!api/.*).*)",
       "destination": "/index.html"
     }
