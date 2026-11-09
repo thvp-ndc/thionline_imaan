@@ -1,17 +1,50 @@
 import React, { useState, useEffect } from 'react';
 import TeacherDashboard from './components/teacher/TeacherDashboard';
+import TeacherAuthGate from './components/teacher/TeacherAuthGate';
 import StudentApp from './components/student/StudentApp';
-import { BookOpen, Laptop, Wifi, Shield, CheckCircle2 } from 'lucide-react';
+import OnlineStudentPortal from './components/online/OnlineStudentPortal';
+import LicenseLockScreen from './components/common/LicenseLockScreen';
+import LicenseModal from './components/common/LicenseModal';
+import { BookOpen, Laptop, Wifi, Shield, CheckCircle2, Award, Key } from 'lucide-react';
 
 export default function App() {
+  const isCloudMode = typeof window !== 'undefined' && (
+    import.meta.env.VITE_APP_TARGET === 'cloud' ||
+    window.location.hostname.includes('vercel.app') ||
+    window.location.hostname.includes('supabase')
+  );
+
   const [role, setRole] = useState(() => {
     const path = window.location.pathname.toLowerCase();
     if (path.startsWith('/teacher')) return 'teacher';
     if (path.startsWith('/student')) return 'student';
-    return null; // Show role portal
+    return isCloudMode ? 'student' : null; // Trên Cloud mặc định mở Cổng Thi Học Sinh
+  });
+
+  const [teacherToken, setTeacherToken] = useState(() => {
+    return sessionStorage.getItem('lan_exam_teacher_token') || null;
   });
 
   const [serverInfo, setServerInfo] = useState(null);
+  const [licenseStatus, setLicenseStatus] = useState(null);
+  const [isLicenseModalOpen, setIsLicenseModalOpen] = useState(false);
+
+  const fetchLicenseStatus = async () => {
+    if (isCloudMode) return; // Môi trường Cloud bỏ qua kiểm tra phần cứng offline
+    try {
+      const res = await fetch('/api/license/status');
+      const data = await res.json();
+      if (data.success) {
+        setLicenseStatus(data);
+      }
+    } catch (err) {
+      console.error('Lỗi kiểm tra bản quyền:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchLicenseStatus();
+  }, []);
 
   useEffect(() => {
     fetch('/api/system/info')
@@ -20,12 +53,65 @@ export default function App() {
       .catch(console.error);
   }, []);
 
-  if (role === 'teacher') {
-    return <TeacherDashboard />;
+  useEffect(() => {
+    if (teacherToken) {
+      fetch('/api/auth/teacher-verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: teacherToken })
+      })
+        .then(r => r.json())
+        .then(d => {
+          if (!d.authenticated) {
+            sessionStorage.removeItem('lan_exam_teacher_token');
+            setTeacherToken(null);
+          }
+        })
+        .catch(console.error);
+    }
+  }, [teacherToken]);
+
+  // NẾU BẢN QUYỀN HẾT HẠN HOẶC BỊ GIAN LẬN THỜI GIAN: KHÓA TOÀN BỘ HỆ THỐNG (Chỉ áp dụng Offline LAN)
+  if (!isCloudMode && licenseStatus && (licenseStatus.is_expired || licenseStatus.is_tampered)) {
+    return (
+      <LicenseLockScreen
+        licenseStatus={licenseStatus}
+        onRefreshStatus={fetchLicenseStatus}
+      />
+    );
   }
 
-  if (role === 'student') {
-    return <StudentApp />;
+  if (role === 'teacher') {
+    if (!teacherToken) {
+      return (
+        <TeacherAuthGate
+          onAuthenticated={(token) => {
+            setTeacherToken(token);
+          }}
+          onBack={() => {
+            window.history.pushState({}, '', '/');
+            setRole(isCloudMode ? 'student' : null);
+          }}
+        />
+      );
+    }
+    return (
+      <TeacherDashboard
+        licenseStatus={licenseStatus}
+        onRefreshLicense={fetchLicenseStatus}
+        onLogout={() => {
+          sessionStorage.removeItem('lan_exam_teacher_token');
+          setTeacherToken(null);
+          window.history.pushState({}, '', '/');
+          setRole(isCloudMode ? 'student' : null);
+        }}
+      />
+    );
+  }
+
+  // Môi trường Cloud: Học sinh sử dụng Cổng thi Online tối ưu Mobile & Serverless
+  if (isCloudMode || role === 'student') {
+    return isCloudMode ? <OnlineStudentPortal /> : <StudentApp />;
   }
 
   return (
@@ -35,11 +121,42 @@ export default function App() {
 
       <div className="max-w-xl w-full text-center space-y-8 relative z-10">
         <div className="space-y-3">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-950/80 border border-emerald-800 text-emerald-400 text-xs font-semibold">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> MÁY CHỦ MẠNG LAN HOẠT ĐỘNG TỐT
+          <div className="flex items-center justify-center gap-2 flex-wrap">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-950/80 border border-emerald-800 text-emerald-400 text-xs font-semibold">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> MÁY CHỦ MẠNG LAN HOẠT ĐỘNG TỐT
+            </div>
+
+            {/* Badge Bản quyền VNLAN */}
+            {licenseStatus && (
+              <button
+                type="button"
+                onClick={() => setIsLicenseModalOpen(true)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border transition hover:opacity-90 active:scale-95 ${
+                  licenseStatus.is_licensed
+                    ? 'bg-sky-950/80 border-sky-700 text-sky-400'
+                    : 'bg-amber-950/80 border-amber-700 text-amber-400'
+                }`}
+                title="Nhấp để xem chi tiết bản quyền và kích hoạt"
+              >
+                <Award className="w-3.5 h-3.5" />
+                <span>
+                  {licenseStatus.is_licensed
+                    ? `Bản Quyền: ${licenseStatus.client_name || 'Chính Thức'}`
+                    : `Dùng thử (còn ${licenseStatus.days_left} ngày)`}
+                </span>
+                <Key className="w-3 h-3 ml-0.5 opacity-70" />
+              </button>
+            )}
           </div>
-          <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
-            Hệ Thống Thi Máy Tính Mạng LAN
+          <div className="flex justify-center pt-2 pb-1">
+            <img 
+              src="/vnlan-logo.png" 
+              alt="VNLAN Logo" 
+              className="h-20 sm:h-24 w-auto object-contain drop-shadow-md select-none brightness-105" 
+            />
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+            Hệ Thống Thi Trực Tuyến Mạng LAN Offline
           </h1>
           <p className="text-slate-400 text-sm max-w-md mx-auto">
             Giải pháp tổ chức kiểm tra trắc nghiệm & tự luận ngoại tuyến (Offline) cho phòng máy trường học và trung tâm đào tạo
@@ -90,13 +207,13 @@ export default function App() {
               <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center mb-4 group-hover:scale-110 transition">
                 <Laptop className="w-6 h-6" />
               </div>
-              <h3 className="font-bold text-lg text-white group-hover:text-emerald-400 transition">Dành Cho Thí Sinh</h3>
+              <h3 className="font-bold text-lg text-white group-hover:text-emerald-400 transition">VNLAN - Cổng làm bài của học sinh</h3>
               <p className="text-xs text-slate-400 mt-2 leading-relaxed">
                 Đăng nhập phòng thi, làm bài trắc nghiệm & soạn bài tự luận, đếm ngược thời gian, tự động lưu đáp án.
               </p>
             </div>
             <div className="mt-6 text-xs font-semibold text-emerald-400 flex items-center gap-1">
-              Vào phòng thi làm bài ➔
+              Vào cổng làm bài ➔
             </div>
           </button>
         </div>
@@ -114,6 +231,15 @@ export default function App() {
           </span>
         </div>
       </div>
+
+      {/* Modal Quản lý và Kích hoạt bản quyền VNLAN */}
+      <LicenseModal
+        isOpen={isLicenseModalOpen}
+        onClose={() => setIsLicenseModalOpen(false)}
+        licenseStatus={licenseStatus}
+        schoolInfo={serverInfo?.schoolInfo}
+        onRefreshStatus={fetchLicenseStatus}
+      />
     </div>
   );
 }
