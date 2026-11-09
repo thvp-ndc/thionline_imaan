@@ -3,5 +3,11 @@
   "framework": "vite",
   "installCommand": "npm --prefix client install",
   "buildCommand": "npm run build:cloud",
-  "outputDirectory": "client/dist"
+  "outputDirectory": "client/dist",
+  "rewrites": [
+    {
+      "source": "/((?!api/.*).*)",
+      "destination": "/index.html"
+    }
+  ]
 }

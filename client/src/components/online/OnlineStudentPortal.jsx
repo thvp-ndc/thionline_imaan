@@ -28,7 +28,7 @@ import {
   Smartphone
 } from 'lucide-react';
 
-export default function OnlineStudentPortal() {
+export default function OnlineStudentPortal({ onSwitchToTeacher }) {
   // --- STATE QUẢN LÝ TIẾN TRÌNH ---
   const [step, setStep] = useState('login'); // 'login' | 'exam' | 'result'
 
@@ -434,6 +434,12 @@ export default function OnlineStudentPortal() {
             <div className="pt-2 text-center">
               <a
                 href="/teacher"
+                onClick={(e) => {
+                  if (onSwitchToTeacher) {
+                    e.preventDefault();
+                    onSwitchToTeacher();
+                  }
+                }}
                 className="text-xs text-slate-400 hover:text-sky-400 transition"
               >
                 Thầy/Cô quản trị? Bấm vào đây để đăng nhập

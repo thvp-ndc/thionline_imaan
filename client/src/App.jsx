@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import TeacherDashboard from './components/teacher/TeacherDashboard';
 import TeacherAuthGate from './components/teacher/TeacherAuthGate';
+import CloudTeacherPortal from './components/teacher/CloudTeacherPortal';
 import StudentApp from './components/student/StudentApp';
 import OnlineStudentPortal from './components/online/OnlineStudentPortal';
 import LicenseLockScreen from './components/common/LicenseLockScreen';
@@ -95,6 +96,22 @@ export default function App() {
         />
       );
     }
+    if (isCloudMode) {
+      return (
+        <CloudTeacherPortal
+          onLogout={() => {
+            sessionStorage.removeItem('lan_exam_teacher_token');
+            setTeacherToken(null);
+            window.history.pushState({}, '', '/');
+            setRole('student');
+          }}
+          onSwitchToStudent={() => {
+            window.history.pushState({}, '', '/');
+            setRole('student');
+          }}
+        />
+      );
+    }
     return (
       <TeacherDashboard
         licenseStatus={licenseStatus}
@@ -103,7 +120,7 @@ export default function App() {
           sessionStorage.removeItem('lan_exam_teacher_token');
           setTeacherToken(null);
           window.history.pushState({}, '', '/');
-          setRole(isCloudMode ? 'student' : null);
+          setRole(null);
         }}
       />
     );
@@ -111,7 +128,16 @@ export default function App() {
 
   // Môi trường Cloud: Học sinh sử dụng Cổng thi Online tối ưu Mobile & Serverless
   if (isCloudMode || role === 'student') {
-    return isCloudMode ? <OnlineStudentPortal /> : <StudentApp />;
+    return isCloudMode ? (
+      <OnlineStudentPortal
+        onSwitchToTeacher={() => {
+          window.history.pushState({}, '', '/teacher');
+          setRole('teacher');
+        }}
+      />
+    ) : (
+      <StudentApp />
+    );
   }
 
   return (
