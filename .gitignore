@@ -12,6 +12,7 @@ server/data/*.db-shm
 .env
 .env.*
 *.env
+!.env.example
 MK*.txt
 *password*.txt
 *secret*.txt
