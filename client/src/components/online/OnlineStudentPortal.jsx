@@ -1,6 +1,14 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import MathContent from '../common/MathContent';
 import {
+  saveAnswerLocally,
+  loadCachedAnswers,
+  saveAttemptMetadata,
+  loadAttemptMetadata,
+  clearExamLocalData,
+  fetchWithBackoff
+} from '../../utils/indexedDBStorage';
+import {
   Clock,
   CheckCircle2,
   AlertCircle,
@@ -127,6 +135,25 @@ export default function OnlineStudentPortal() {
       const rawQuestions = data.paper?.questions || [];
       setQuestions(rawQuestions);
 
+      // Phục hồi câu trả lời từ IndexedDB nếu có (Chống mất bài khi F5 hoặc rớt mạng)
+      const currentStudentCode = data.student?.studentCode || studentCode;
+      const cachedAnswers = await loadCachedAnswers(data.session.id, currentStudentCode);
+      if (cachedAnswers && Object.keys(cachedAnswers).length > 0) {
+        setAnswers(cachedAnswers);
+      }
+
+      // Lưu metadata phiên thi để tự động khôi phục
+      saveAttemptMetadata({
+        sessionId: data.session.id,
+        studentCode: currentStudentCode,
+        metadata: {
+          token,
+          sessionInfo: data.session,
+          studentProfile: data.student,
+          deadlineAt: data.student?.deadlineAt
+        }
+      });
+
       // Tính thời gian còn lại ban đầu
       const deadline = new Date(data.student?.deadlineAt || data.session?.hardCutoffAt).getTime();
       const now = Date.now();
@@ -199,37 +226,65 @@ export default function OnlineStudentPortal() {
   };
 
   // -------------------------------------------------------------
-  // BƯỚC 3: XỬ LÝ CHỌN ĐÁP ÁN (LOCAL AUTOSAVE)
+  // BƯỚC 3: XỬ LÝ CHỌN ĐÁP ÁN (LOCAL AUTOSAVE VÀO INDEXEDDB)
   // -------------------------------------------------------------
   const currentQuestion = questions[currentIndex] || null;
 
   const handleSelectOption = (qId, optionId) => {
+    const newAnswer = { selected_options: [optionId] };
     setAnswers((prev) => ({
       ...prev,
-      [qId]: { selected_options: [optionId] }
+      [qId]: newAnswer
     }));
+
+    // Ghi ngay lập tức vào IndexedDB (độ trễ < 1ms)
+    if (sessionInfo?.id && studentProfile?.studentCode) {
+      saveAnswerLocally({
+        sessionId: sessionInfo.id,
+        studentCode: studentProfile.studentCode,
+        questionId: qId,
+        answer: newAnswer
+      });
+    }
   };
 
   const handleSelectTrueFalse = (qId, subKey, choiceValue) => {
-    setAnswers((prev) => {
-      const oldTF = prev[qId]?.true_false_answers || {};
-      return {
-        ...prev,
-        [qId]: {
-          true_false_answers: {
-            ...oldTF,
-            [subKey]: choiceValue // 'T' hoặc 'F'
-          }
-        }
-      };
-    });
+    const oldTF = answers[qId]?.true_false_answers || {};
+    const newTF = { ...oldTF, [subKey]: choiceValue };
+    const newAnswer = { true_false_answers: newTF };
+
+    setAnswers((prev) => ({
+      ...prev,
+      [qId]: newAnswer
+    }));
+
+    // Ghi ngay lập tức vào IndexedDB
+    if (sessionInfo?.id && studentProfile?.studentCode) {
+      saveAnswerLocally({
+        sessionId: sessionInfo.id,
+        studentCode: studentProfile.studentCode,
+        questionId: qId,
+        answer: newAnswer
+      });
+    }
   };
 
   const handleShortAnswerChange = (qId, textValue) => {
+    const newAnswer = { short_answer: textValue };
     setAnswers((prev) => ({
       ...prev,
-      [qId]: { short_answer: textValue }
+      [qId]: newAnswer
     }));
+
+    // Ghi ngay lập tức vào IndexedDB
+    if (sessionInfo?.id && studentProfile?.studentCode) {
+      saveAnswerLocally({
+        sessionId: sessionInfo.id,
+        studentCode: studentProfile.studentCode,
+        questionId: qId,
+        answer: newAnswer
+      });
+    }
   };
 
   // Tính số câu đã làm
@@ -271,6 +326,11 @@ export default function OnlineStudentPortal() {
         alert(data.error || 'Nộp bài không thành công. Vui lòng thử lại!');
         setIsSubmitting(false);
         return;
+      }
+
+      // Xóa sạch bộ nhớ đệm cục bộ khi đã nộp bài thành công lên Server
+      if (sessionInfo?.id && studentProfile?.studentCode) {
+        await clearExamLocalData(sessionInfo.id, studentProfile.studentCode);
       }
 
       setExamResult(data);
