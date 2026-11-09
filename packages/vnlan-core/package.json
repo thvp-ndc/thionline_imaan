@@ -1,0 +1,18 @@
+{
+  "name": "@vnlan/core",
+  "version": "1.0.0",
+  "description": "VNLAN Core Domain - Pure business logic, grading engine, and interface contracts shared between Offline LAN and Online Cloud",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "test": "node tests/test_grading_engine.mjs"
+  },
+  "keywords": [
+    "vnlan",
+    "grading-engine",
+    "exam-core",
+    "hybrid-exam"
+  ],
+  "author": "Antigravity IT Specialist & Lead Architect",
+  "license": "ISC"
+}
