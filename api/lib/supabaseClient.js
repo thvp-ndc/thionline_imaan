@@ -121,8 +121,8 @@ class PostgrestQueryBuilder {
 
 class SupabaseServerClient {
   constructor(url, key) {
-    this.url = url || process.env.SUPABASE_URL || 'https://beayyaqgxtkhqkldwhda.supabase.co';
-    this.key = key || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
+    this.url = url || process.env.SUPABASE_URL || 'https://omzfqtncmxfpkuvjambl.supabase.co';
+    this.key = key || process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || '';
   }
 
   from(table) {
