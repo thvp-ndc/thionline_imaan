@@ -6,6 +6,10 @@
   "outputDirectory": "client/dist",
   "rewrites": [
     {
+      "source": "/api/teacher/:path*",
+      "destination": "/api/teacher?action=:path*"
+    },
+    {
       "source": "/api/auth/:path*",
       "destination": "/api/auth?action=:path*"
     },

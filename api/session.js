@@ -1,11 +1,12 @@
 /**
  * Vercel Serverless Function: GET /api/session
  * Cấp phát Đề thi đã loại bỏ 100% Đáp án Đúng (P0 Fix):
- * - Chỉ đọc từ bảng exam_papers
- * - Tuyệt đối KHÔNG đọc bảng exam_answer_keys
+ * - Đọc từ Vercel Storage (Vercel KV) hoặc Supabase
+ * - Tuyệt đối KHÔNG đọc đáp án bí mật
  * - Kiểm tra phiên thi và thời hạn làm bài của học sinh
  */
 
+import { getStorageClient } from './_lib/storageClient.js';
 import { getSupabaseServerClient } from './_lib/supabaseClient.js';
 import { verifyJWT } from './_lib/security.js';
 
@@ -47,9 +48,54 @@ export default async function handler(req, res) {
       return res.status(400).json({ success: false, error: 'Thiếu mã ca thi!' });
     }
 
+    // 1. Kiểm tra trong Vercel Storage trước
+    const storage = getStorageClient();
+    const storageSession = await storage.getSession(sessionId);
+
+    if (storageSession) {
+      const storagePaper = await storage.getPaper(storageSession.id);
+      if (!storagePaper) {
+        return res.status(404).json({ success: false, error: 'Đề thi của ca này chưa được tải lên hệ thống!' });
+      }
+
+      if (!isTeacher) {
+        const studentCode = decoded.studentCode;
+        const sub = await storage.getSubmission(storageSession.id, studentCode);
+        if (sub) {
+          return res.status(403).json({
+            success: false,
+            error: 'Thí sinh đã hoàn thành và nộp bài thi rồi!',
+            code: 'ALREADY_SUBMITTED'
+          });
+        }
+      }
+
+      return res.status(200).json({
+        success: true,
+        session: {
+          id: storageSession.id,
+          title: storageSession.title,
+          subject: storageSession.subject_name || storageSession.subject,
+          durationMinutes: storageSession.duration_minutes || storageSession.durationMinutes,
+          status: storageSession.status,
+          allowReview: !!storageSession.allow_review
+        },
+        paper: {
+          id: storagePaper.id,
+          version: storagePaper.version || 1,
+          questions: storagePaper.questions_payload || []
+        },
+        student: isTeacher ? null : {
+          studentCode: decoded.studentCode,
+          studentName: decoded.studentName,
+          deadlineAt: decoded.deadlineAt
+        }
+      });
+    }
+
+    // 2. Fallback: Supabase Database
     const supabase = getSupabaseServerClient();
 
-    // 1. Lấy thông tin Ca thi
     const { data: session, error: sErr } = await supabase
       .from('exam_sessions')
       .select('*')
@@ -60,7 +106,6 @@ export default async function handler(req, res) {
       return res.status(404).json({ success: false, error: 'Không tìm thấy ca thi!' });
     }
 
-    // 2. Lấy Đề thi công khai từ exam_papers (ĐÃ LOẠI BỎ ĐÁP ÁN ĐÚNG)
     const { data: paper, error: pErr } = await supabase
       .from('exam_papers')
       .select('id, version, questions_payload')
@@ -73,7 +118,6 @@ export default async function handler(req, res) {
       return res.status(404).json({ success: false, error: 'Đề thi của ca này chưa được tải lên hệ thống!' });
     }
 
-    // 3. Nếu là Học sinh: Kiểm tra trạng thái nộp bài
     if (!isTeacher) {
       const studentCode = decoded.studentCode;
       const { data: attempt } = await supabase
@@ -92,7 +136,6 @@ export default async function handler(req, res) {
       }
     }
 
-    // Trả về cấu trúc đề thi an toàn (chỉ chứa câu hỏi, lựa chọn và điểm tối đa của câu)
     return res.status(200).json({
       success: true,
       session: {
@@ -107,7 +150,7 @@ export default async function handler(req, res) {
       paper: {
         id: paper.id,
         version: paper.version,
-        questions: paper.questions_payload // Danh sách câu hỏi công khai
+        questions: paper.questions_payload
       },
       student: isTeacher ? null : {
         studentCode: decoded.studentCode,

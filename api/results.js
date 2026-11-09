@@ -5,8 +5,8 @@
  * - Chỉ mở khóa chi tiết câu đúng/sai khi cho phép (allow_review)
  */
 
+import { getStorageClient } from './_lib/storageClient.js';
 import { getSupabaseServerClient } from './_lib/supabaseClient.js';
-import { verifyJWT } from './_lib/security.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -23,9 +23,53 @@ export default async function handler(req, res) {
     const cleanSessionId = String(session_id).trim();
     const cleanStudentCode = String(student_code).trim().toUpperCase();
 
+    // 1. Kiểm tra trong Vercel Storage
+    const storage = getStorageClient();
+    const storageSession = await storage.getSession(cleanSessionId);
+
+    if (storageSession) {
+      const submission = await storage.getSubmission(storageSession.id, cleanStudentCode);
+      if (!submission) {
+        return res.status(404).json({
+          success: false,
+          error: 'Chưa tìm thấy bài thi đã nộp cho Số báo danh này trong ca thi!'
+        });
+      }
+
+      const isScoresReleased = (
+        storageSession.score_release_mode === 'immediate' ||
+        storageSession.scores_released_at !== undefined
+      );
+
+      if (!isScoresReleased) {
+        return res.status(200).json({
+          success: true,
+          isScoresReleased: false,
+          submittedAt: submission.submitted_at,
+          studentCode: cleanStudentCode,
+          sessionTitle: storageSession.title,
+          message: 'Bài thi đã được ghi nhận an toàn trên hệ thống. Điểm số sẽ được Giáo viên công bố sau!'
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        isScoresReleased: true,
+        allowReview: !!storageSession.allow_review,
+        studentCode: cleanStudentCode,
+        sessionTitle: storageSession.title,
+        score: submission.score,
+        mcqScore: submission.mcq_score,
+        essayScore: submission.essay_score,
+        submittedAt: submission.submitted_at,
+        details: storageSession.allow_review ? submission.details_json : null,
+        message: 'Tra cứu kết quả bài thi thành công!'
+      });
+    }
+
+    // 2. Fallback: Supabase Backend
     const supabase = getSupabaseServerClient();
 
-    // 1. Kiểm tra Ca thi & Chế độ mở điểm
     const { data: session, error: sErr } = await supabase
       .from('exam_sessions')
       .select('*')
@@ -41,7 +85,6 @@ export default async function handler(req, res) {
       (session.score_release_mode === 'manual_release' && session.scores_released_at !== null)
     );
 
-    // 2. Tra cứu Bài nộp của Học sinh
     const { data: submission, error: subErr } = await supabase
       .from('student_submissions')
       .select('*')
@@ -56,7 +99,6 @@ export default async function handler(req, res) {
       });
     }
 
-    // Nếu ca thi chưa mở công bố điểm
     if (!isScoresReleased) {
       return res.status(200).json({
         success: true,
@@ -68,7 +110,6 @@ export default async function handler(req, res) {
       });
     }
 
-    // Đã mở công bố điểm
     return res.status(200).json({
       success: true,
       isScoresReleased: true,
