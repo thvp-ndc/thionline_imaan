@@ -8,8 +8,24 @@ server/data/*.db*
 server/data/*.db-wal
 server/data/*.db-shm
 
-# Build output (client dist is built into server/public)
+# Credentials and local keys
+.env
+.env.*
+*.env
+MK*.txt
+*password*.txt
+*secret*.txt
+
+# Build output
 client/dist/
+dist/
+
+# Database dumps and sensitive backups (P0 Security)
+*.dump
+*.sql.gz
+*.backup
+*.json.gz
+backup_*.sql
 
 # Logs
 *.log

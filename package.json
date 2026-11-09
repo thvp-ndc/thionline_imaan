@@ -7,6 +7,7 @@
     "server": "cd server && npm start",
     "client": "cd client && npm run dev",
     "build:client": "cd client && npm run build",
+    "build:cloud": "npm --prefix client run build:cloud",
     "test:core": "node packages/vnlan-core/tests/test_grading_engine.mjs",
     "test:tf": "node test_tf_suite.mjs",
     "kiosk": "cd kiosk-client && npm start",
