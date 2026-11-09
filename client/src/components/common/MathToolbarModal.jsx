@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Check, Search, Sparkles } from 'lucide-react';
 import katex from 'katex';
 
@@ -103,33 +103,41 @@ const MATH_CATEGORIES = [
   }
 ];
 
-export default function MathToolbarModal({ isOpen, onClose, onInsert }) {
+export default function MathToolbarModal({ isOpen, onClose, onInsert, onInsertMath }) {
   const [activeTab, setActiveTab] = useState('algebra');
-  const [customInput, setCustomInput] = useState('');
-  const [copiedNotification, setCopiedNotification] = useState(false);
+  const [latexInput, setLatexInput] = useState('');
+  const [justAddedSymbol, setJustAddedSymbol] = useState(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setLatexInput('');
+      setJustAddedSymbol(null);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
   const currentCategory = MATH_CATEGORIES.find(c => c.id === activeTab) || MATH_CATEGORIES[0];
 
-  const handleItemClick = (latex) => {
-    // Chèn dạng $ latex $ nếu chưa có $
-    const formatted = latex.startsWith('$') ? latex : `$${latex}$`;
-    onInsert(formatted);
-    showNotice();
+  const handleInsertCallback = (latex) => {
+    if (typeof onInsert === 'function') onInsert(latex);
+    if (typeof onInsertMath === 'function') onInsertMath(latex);
   };
 
-  const handleInsertCustom = () => {
-    if (!customInput.trim()) return;
-    const formatted = customInput.startsWith('$') ? customInput : `$${customInput}$`;
-    onInsert(formatted);
-    setCustomInput('');
-    showNotice();
+  // Nối ký hiệu được click vào khung nhập
+  const handleInsertSymbol = (latexCode) => {
+    setLatexInput((prev) => (prev ? `${prev} ${latexCode}` : latexCode));
+    setJustAddedSymbol(latexCode);
+    setTimeout(() => setJustAddedSymbol(null), 300);
   };
 
-  const showNotice = () => {
-    setCopiedNotification(true);
-    setTimeout(() => setCopiedNotification(false), 1500);
+  // Nút chính [✓ Chèn Vào Đề Bài]: chèn toàn bộ chuỗi $ ${latexInput} $ trực tiếp và đóng modal
+  const handleConfirmInsert = () => {
+    const trimmed = latexInput.trim();
+    if (!trimmed) return;
+    const formatted = trimmed.startsWith('$') ? trimmed : `$${trimmed}$`;
+    handleInsertCallback(formatted);
+    onClose();
   };
 
   const renderKatexSafely = (tex, displayMode = false) => {
@@ -146,42 +154,39 @@ export default function MathToolbarModal({ isOpen, onClose, onInsert }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4 backdrop-blur-sm animate-fadeIn">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-fadeIn">
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-4xl max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-950/50">
-          <div className="flex items-center gap-2.5 text-blue-400">
+        <div className="px-5 py-3.5 border-b border-slate-800 flex justify-between items-center bg-slate-950/60 shrink-0">
+          <div className="flex items-center gap-2.5 text-cyan-400">
             <Sparkles className="w-5 h-5 text-amber-400" />
-            <h2 className="text-lg font-semibold text-white">Bảng Ký Hiệu & Công Thức Toán Học</h2>
-            <span className="text-xs text-slate-400 bg-slate-800 px-2.5 py-0.5 rounded-full border border-slate-700">
+            <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
+              Bảng Ký Hiệu & Công Thức Toán Học
+            </h2>
+            <span className="text-xs text-slate-400 bg-slate-800 px-2.5 py-0.5 rounded-full border border-slate-700 hidden sm:inline-block">
               KaTeX Chuẩn LaTeX
             </span>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            title="Đóng modal"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Notification Toast */}
-        {copiedNotification && (
-          <div className="bg-emerald-500/20 border-b border-emerald-500/30 text-emerald-300 text-xs px-6 py-1.5 flex items-center gap-2 animate-fadeIn">
-            <Check className="w-4 h-4 text-emerald-400" />
-            <span>Đã chèn công thức vào vị trí soạn thảo thành công!</span>
-          </div>
-        )}
-
-        {/* Tab Header */}
-        <div className="flex overflow-x-auto border-b border-slate-800 px-6 bg-slate-950/30 gap-1 pt-2">
+        {/* Tab Header: Hàng Tabs cuộn ngang mượt mà no-scrollbar flex-nowrap */}
+        <div className="flex overflow-x-auto no-scrollbar flex-nowrap border-b border-slate-800 px-4 sm:px-6 bg-slate-950/30 gap-1.5 pt-2 shrink-0">
           {MATH_CATEGORIES.map(cat => (
             <button
               key={cat.id}
+              type="button"
               onClick={() => setActiveTab(cat.id)}
-              className={`px-4 py-2.5 text-xs sm:text-sm font-medium whitespace-nowrap rounded-t-lg transition-all ${
+              className={`px-3.5 py-2 text-xs sm:text-sm font-semibold whitespace-nowrap shrink-0 rounded-t-lg transition-all ${
                 activeTab === cat.id
-                  ? 'bg-slate-800 text-blue-400 border-t-2 border-blue-500 shadow'
+                  ? 'bg-slate-800 text-cyan-400 border-t-2 border-cyan-500 shadow'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
               }`}
             >
@@ -190,68 +195,119 @@ export default function MathToolbarModal({ isOpen, onClose, onInsert }) {
           ))}
         </div>
 
-        {/* Grid Symbols */}
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {currentCategory.items.map((item, idx) => (
-              <button
-                key={idx}
-                onClick={() => handleItemClick(item.latex)}
-                className="group p-3 bg-slate-800/60 hover:bg-blue-600/20 hover:border-blue-500/60 border border-slate-700/60 rounded-xl flex flex-col items-center justify-between text-center transition-all cursor-pointer h-24"
-                title={`Nhấn để chèn: ${item.latex}`}
-              >
-                <div
-                  className="flex-1 flex items-center justify-center text-slate-100 text-base group-hover:scale-105 transition-transform"
-                  dangerouslySetInnerHTML={renderKatexSafely(item.display)}
-                />
-                <span className="text-[11px] text-slate-400 group-hover:text-blue-300 font-medium truncate w-full">
-                  {item.label}
-                </span>
-              </button>
-            ))}
+        {/* Grid Symbols: Thu gọn lưới ký hiệu grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 */}
+        <div className="flex-1 overflow-y-auto p-3.5 sm:p-5">
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 sm:gap-2.5">
+            {currentCategory.items.map((item, idx) => {
+              const isRecentlyAdded = justAddedSymbol === item.latex;
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => handleInsertSymbol(item.latex)}
+                  className={`group p-2 rounded-xl border flex flex-col items-center justify-between text-center transition-all cursor-pointer h-18 sm:h-20 select-none ${
+                    isRecentlyAdded
+                      ? 'bg-cyan-500/20 border-cyan-400 scale-95 shadow-cyan-900/40 shadow-sm'
+                      : 'bg-slate-800/60 hover:bg-cyan-600/15 hover:border-cyan-500/50 border-slate-700/60'
+                  }`}
+                  title={`Nhấp để thêm vào khung nhập: ${item.latex}`}
+                >
+                  <div
+                    className="flex-1 flex items-center justify-center text-slate-100 text-sm sm:text-base group-hover:scale-105 transition-transform overflow-hidden px-1 pointer-events-none"
+                    dangerouslySetInnerHTML={renderKatexSafely(item.display)}
+                  />
+                  <span className="text-[10px] sm:text-[11px] text-slate-400 group-hover:text-cyan-300 font-medium truncate w-full px-0.5">
+                    {item.label}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        {/* Custom Input & Live Preview Footer */}
-        <div className="p-4 border-t border-slate-800 bg-slate-950/70 flex flex-col sm:flex-row items-center gap-3">
-          <div className="flex-1 w-full flex items-center gap-2">
-            <span className="text-xs font-mono text-slate-400">$</span>
-            <input
-              type="text"
-              value={customInput}
-              onChange={(e) => setCustomInput(e.target.value)}
-              placeholder="Nhập mã LaTeX tùy ý (ví dụ: \frac{x^2 - 1}{x + 1})..."
-              className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-blue-500 font-mono"
-              onKeyDown={(e) => e.key === 'Enter' && handleInsertCustom()}
-            />
-            <span className="text-xs font-mono text-slate-400">$</span>
+        {/* Footer: Input, Live Preview, and Action Buttons */}
+        <div className="p-3.5 sm:p-4 border-t border-slate-800 bg-slate-950/80 flex flex-col gap-3 shrink-0">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+            {/* Input Container liên kết 2 chiều với latexInput */}
+            <div className="flex-1 flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 focus-within:border-cyan-500 focus-within:ring-1 focus-within:ring-cyan-500/50 transition">
+              <span className="text-xs font-mono text-cyan-400 select-none font-bold">$</span>
+              <input
+                type="text"
+                value={latexInput}
+                onChange={(e) => setLatexInput(e.target.value)}
+                placeholder="Nhấp vào ký hiệu ở trên hoặc gõ mã LaTeX (ví dụ: \frac{a}{b}, \sqrt{x})..."
+                className="flex-1 bg-transparent text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none font-mono"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleConfirmInsert();
+                  }
+                }}
+              />
+              <span className="text-xs font-mono text-cyan-400 select-none font-bold">$</span>
+              {latexInput && (
+                <button
+                  type="button"
+                  onClick={() => setLatexInput('')}
+                  className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition"
+                  title="Xóa khung nhập"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Live Preview Box */}
+            {latexInput.trim() && (
+              <div
+                className="px-3 py-1.5 bg-slate-900 border border-cyan-800/60 rounded-xl min-w-[120px] max-w-full sm:max-w-xs overflow-x-auto flex items-center justify-center text-center shadow-inner shrink-0"
+                title="Xem trước kết quả hiển thị công thức"
+              >
+                <div className="text-[11px] text-slate-400 mr-2 shrink-0 select-none font-medium">Xem trước:</div>
+                <span
+                  className="text-sm text-cyan-300 font-medium"
+                  dangerouslySetInnerHTML={renderKatexSafely(latexInput.trim())}
+                />
+              </div>
+            )}
           </div>
 
-          {customInput && (
-            <div className="px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg min-w-[120px] max-w-xs overflow-x-auto text-center">
-              <span
-                className="text-sm text-slate-100"
-                dangerouslySetInnerHTML={renderKatexSafely(customInput)}
-              />
+          {/* Action Buttons Row */}
+          <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/60">
+            <div className="text-[11px] text-slate-400 hidden sm:block">
+              {latexInput.trim() ? (
+                <span>Nhấn <kbd className="px-1 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300 font-mono">Enter</kbd> hoặc nút chèn để hoàn tất</span>
+              ) : (
+                <span>Nhấp chọn các ký hiệu trên bảng để ghép thành công thức</span>
+              )}
             </div>
-          )}
 
-          <div className="flex gap-2 w-full sm:w-auto">
-            {customInput && (
+            <div className="flex items-center gap-2 ml-auto w-full sm:w-auto justify-end">
+              {/* Nút Đóng / Hủy (Outline xám) */}
               <button
-                onClick={handleInsertCustom}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs sm:text-sm font-medium rounded-lg shadow transition-colors flex items-center gap-1.5"
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 bg-transparent hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 text-xs sm:text-sm font-semibold rounded-lg transition"
+              >
+                Đóng / Hủy
+              </button>
+
+              {/* Nút chính [✓ Chèn Vào Đề Bài] (Màu xanh/cyan) */}
+              <button
+                type="button"
+                onClick={handleConfirmInsert}
+                disabled={!latexInput.trim()}
+                className={`px-4 py-2 text-xs sm:text-sm font-bold rounded-lg shadow-sm transition flex items-center gap-1.5 ${
+                  latexInput.trim()
+                    ? 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-cyan-950/40 cursor-pointer active:scale-95'
+                    : 'bg-slate-800/80 text-slate-500 border border-slate-700/60 cursor-not-allowed opacity-50'
+                }`}
+                title="Chèn toàn bộ công thức vào vị trí soạn thảo và đóng modal"
               >
                 <Check className="w-4 h-4" />
-                Chèn mã
+                ✓ Chèn Vào Đề Bài
               </button>
-            )}
-            <button
-              onClick={onClose}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs sm:text-sm rounded-lg transition-colors"
-            >
-              Đóng
-            </button>
+            </div>
           </div>
         </div>
       </div>

@@ -4,9 +4,9 @@ node_modules/
 .pnp.js
 
 # Database and runtime state
-server/data/*.db*
-server/data/*.db-wal
-server/data/*.db-shm
+server/data/
+server/storage/
+*.flag
 
 # Credentials and local keys
 .env
@@ -48,3 +48,10 @@ scratch/
 # User uploaded media
 server/uploads/images/*
 !server/uploads/images/.gitkeep
+
+# Author tools and binary releases
+license_author_tools/
+*.mp4
+build_installer/
+build_release/
+backups_tac_gia/

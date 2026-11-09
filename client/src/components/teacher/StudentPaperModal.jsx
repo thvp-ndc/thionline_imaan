@@ -17,9 +17,12 @@ import {
   Save,
   Upload,
   RotateCcw,
-  Check
+  Check,
+  Archive
 } from 'lucide-react';
 import MathContent from '../common/MathContent';
+import QuestionOptions from '../common/QuestionOptions';
+import { formatToLocalTime } from '../../utils/timeFormat';
 
 const DEFAULT_PRINT_CONFIG = {
   department: 'SỞ GD&ĐT • PHÒNG KHẢO THÍ',
@@ -34,7 +37,7 @@ const DEFAULT_PRINT_CONFIG = {
   noteFooter: ''
 };
 
-export default function StudentPaperModal({ attemptId, sessionId, isBatchMode = false, onClose }) {
+export default function StudentPaperModal({ attemptId, sessionId, isBatchMode = false, autoPrint = false, onClose }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -56,6 +59,19 @@ export default function StudentPaperModal({ attemptId, sessionId, isBatchMode = 
   const fileInputRef = useRef(null);
 
   useEffect(() => {
+    fetch('/api/system/school-info')
+      .then(r => r.json())
+      .then(d => {
+        if (d.success && d.schoolInfo) {
+          setPrintConfig(prev => ({
+            ...prev,
+            schoolName: d.schoolInfo.school_name || prev.schoolName,
+            department: d.schoolInfo.department_name ? `${d.schoolInfo.department_name} • PHÒNG KHẢO THÍ` : prev.department
+          }));
+        }
+      })
+      .catch(() => {});
+
     const fetchData = async () => {
       try {
         setLoading(true);
@@ -86,7 +102,16 @@ export default function StudentPaperModal({ attemptId, sessionId, isBatchMode = 
     fetchData();
   }, [attemptId, sessionId, isBatchMode]);
 
-    const handleOpenNewWindowPrint = () => {
+  useEffect(() => {
+    if (autoPrint && data && !loading && !error) {
+      const timer = setTimeout(() => {
+        handleOpenNewWindowPrint();
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [autoPrint, data, loading, error]);
+
+  const handleOpenNewWindowPrint = () => {
     const printArea = document.getElementById('printable-exam-paper');
     if (!printArea) return;
     const win = window.open('', '_blank');
@@ -122,7 +147,7 @@ export default function StudentPaperModal({ attemptId, sessionId, isBatchMode = 
       padding: 0 !important; page-break-after: always !important; break-after: page !important;
     }
     .print-paper-sheet:last-child { page-break-after: auto !important; break-after: auto !important; }
-    .print-question-item { page-break-inside: avoid !important; break-inside: avoid !important; margin-bottom: 12px; }
+    .print-question-item, .part3-question { page-break-inside: avoid !important; break-inside: avoid !important; margin-bottom: 12px; }
   </style>
 </head>
 <body>
@@ -214,7 +239,7 @@ const handlePrint = () => {
       page-break-after: auto !important;
       break-after: auto !important;
     }
-    .print-question-item {
+    .print-question-item, .part3-question {
       page-break-inside: avoid !important;
       break-inside: avoid !important;
       margin-bottom: 12px;
@@ -355,11 +380,18 @@ const handlePrint = () => {
 
     const part1Questions = questions.filter(q => q.question_type === 'single_choice' || q.question_type === 'multiple_choice');
     const part2Questions = questions.filter(q => q.question_type === 'true_false');
+    const part3Questions = questions.filter(q => q.question_type === 'short_answer');
     const essayQuestions = questions.filter(q => q.question_type === 'essay');
 
     const part1CorrectCount = part1Questions.filter(q => q.is_correct === 1 || q.is_correct === true).length;
     const part1TotalScore = Math.round(part1Questions.reduce((sum, q) => sum + (q.score_obtained || 0), 0) * 100) / 100;
     const part2TotalScore = Math.round(part2Questions.reduce((sum, q) => sum + (q.score_obtained || 0), 0) * 100) / 100;
+    const part3CorrectCount = part3Questions.filter(q => {
+      const sc = Number(q.score_obtained ?? 0);
+      const mx = Number(q.max_score ?? 0.25);
+      return (q.is_correct === 1 || q.is_correct === true) && sc >= mx;
+    }).length;
+    const part3TotalScore = Math.round(part3Questions.reduce((sum, q) => sum + (q.score_obtained || 0), 0) * 100) / 100;
     const isPassed = (attempt.total_score || 0) >= 5.0;
 
     return (
@@ -410,29 +442,32 @@ const handlePrint = () => {
           <div>
             <span className="text-slate-500 block">Thời gian nộp bài:</span>
             <span className="text-slate-700 font-mono text-xs">
-              {attempt.submitted_at
-                ? new Date(attempt.submitted_at).toLocaleTimeString('vi-VN') + ' - ' + new Date(attempt.submitted_at).toLocaleDateString('vi-VN')
-                : 'Chưa nộp'}
+              {formatToLocalTime(attempt.submitted_at, true)}
             </span>
           </div>
         </div>
 
         {/* Khung Điểm & Lời Phê của Giám Khảo */}
         <div className="grid grid-cols-12 border-2 border-slate-800 rounded-xl overflow-hidden mb-6 text-center">
-          {part2Questions.length > 0 ? (
+          {(part2Questions.length > 0 || part3Questions.length > 0) ? (
             <>
               <div className="col-span-2 border-r-2 border-slate-800 bg-slate-100 p-2">
-                <span className="text-[10px] font-bold uppercase text-slate-600 block">Trắc Nghiệm</span>
+                <span className="text-[10px] font-bold uppercase text-slate-600 block">Phần I (MCQ)</span>
                 <strong className="text-xl font-black text-sky-700 block mt-0.5">{part1TotalScore}đ</strong>
                 <span className="text-[10px] text-slate-500">Đúng: {part1CorrectCount}/{part1Questions.length}</span>
               </div>
               <div className="col-span-2 border-r-2 border-slate-800 bg-teal-50 p-2">
-                <span className="text-[10px] font-bold uppercase text-teal-800 block">Đúng / Sai</span>
+                <span className="text-[10px] font-bold uppercase text-teal-800 block">Phần II (Đ/S)</span>
                 <strong className="text-xl font-black text-teal-700 block mt-0.5">{part2TotalScore}đ</strong>
-                <span className="text-[10px] text-teal-600">{part2Questions.length} câu (2025)</span>
+                <span className="text-[10px] text-teal-600">{part2Questions.length} câu</span>
               </div>
-              <div className="col-span-2 border-r-2 border-slate-800 bg-slate-100 p-2">
-                <span className="text-[10px] font-bold uppercase text-slate-600 block">Tự Luận</span>
+              <div className="col-span-2 border-r-2 border-slate-800 bg-violet-50 p-2">
+                <span className="text-[10px] font-bold uppercase text-violet-800 block">Phần III (Ngắn)</span>
+                <strong className="text-xl font-black text-violet-700 block mt-0.5">{part3TotalScore}đ</strong>
+                <span className="text-[10px] text-violet-600">{part3Questions.length} câu</span>
+              </div>
+              <div className="col-span-2 border-r-2 border-slate-800 bg-amber-50 p-2">
+                <span className="text-[10px] font-bold uppercase text-amber-800 block">Tự Luận</span>
                 <strong className="text-xl font-black text-amber-700 block mt-0.5">{attempt.essay_score || 0}đ</strong>
                 <span className="text-[10px] text-slate-500">{essayQuestions.length} câu</span>
               </div>
@@ -443,15 +478,15 @@ const handlePrint = () => {
                 </strong>
                 <span className="text-[10px] font-semibold text-slate-600">{isPassed ? 'ĐẠT' : 'CHƯA ĐẠT'}</span>
               </div>
-              <div className="col-span-4 p-2 text-left bg-white">
-                <span className="text-[10px] font-bold uppercase text-slate-600 block mb-0.5">Lời Phê Của Giám Khảo:</span>
-                <div className="text-xs italic text-slate-700 leading-relaxed">
+              <div className="col-span-2 p-2 text-left bg-white">
+                <span className="text-[10px] font-bold uppercase text-slate-600 block mb-0.5">Lời Phê:</span>
+                <div className="text-[11px] italic text-slate-700 leading-relaxed">
                   {(attempt.violations_count || 0) > 0 && (
                     <span className="text-rose-600 font-semibold block not-italic">
-                      ⚠️ {attempt.violations_count} lần vi phạm quy chế.
+                      ⚠️ {attempt.violations_count} lần vi phạm.
                     </span>
                   )}
-                  {attempt.is_graded ? 'Bài thi đã hoàn tất chấm điểm.' : 'Chờ chấm tự luận.'}
+                  {attempt.is_graded ? 'Đã chấm xong.' : 'Chờ tự luận.'}
                 </div>
               </div>
             </>
@@ -492,9 +527,9 @@ const handlePrint = () => {
         {/* PHẦN I: TRẮC NGHIỆM NHIỀU LỰA CHỌN */}
         {part1Questions.length > 0 && (
           <div className="mb-8">
-            <div className="bg-slate-900 text-white px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wider mb-4 flex justify-between items-center">
+            <div className="bg-slate-100 text-slate-800 border border-slate-300 px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wider mb-4 flex justify-between items-center">
               <span>{part2Questions.length > 0 ? 'PHẦN I. CÂU HỎI TRẮC NGHIỆM NHIỀU LỰA CHỌN' : 'PHẦN I. CÂU HỎI TRẮC NGHIỆM'} ({part1Questions.length} CÂU)</span>
-              <span>Đạt: {part1TotalScore} điểm</span>
+              <span className="text-blue-700">Đạt: {part1TotalScore} điểm</span>
             </div>
 
             <div className="space-y-5">
@@ -508,50 +543,30 @@ const handlePrint = () => {
                     <div className="flex items-start justify-between gap-3 mb-2">
                       <p className="font-bold text-slate-900 text-sm leading-snug">
                         <span className="text-sky-700">Câu {q.display_order}:</span> <MathContent content={q.content} />
+                        {q.is_overridden && (
+                          <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-300">
+                            Đã điều chỉnh đáp án
+                          </span>
+                        )}
                       </p>
                       <span className={`px-2 py-0.5 rounded text-[11px] font-bold flex-shrink-0 flex items-center gap-1 ${
-                        isCorrect ? 'bg-emerald-100 text-emerald-800' : (studentSelected.length > 0 ? 'bg-rose-100 text-rose-800' : 'bg-slate-200 text-slate-600')
+                        isCorrect || (q.score_obtained && q.score_obtained > 0) ? 'bg-emerald-100 text-emerald-800' : (studentSelected.length > 0 ? 'bg-rose-100 text-rose-800' : 'bg-slate-200 text-slate-600')
                       }`}>
-                        {isCorrect ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
-                        {isCorrect ? `+${q.score_obtained || q.max_score}đ` : '0đ'}
+                        {isCorrect || (q.score_obtained && q.score_obtained > 0) ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+                        {isCorrect || (q.score_obtained && q.score_obtained > 0) ? `+${q.score_obtained || q.max_score}đ` : '0đ'}
                       </span>
                     </div>
 
                     {/* Options list */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
-                      {(q.options || []).map(opt => {
-                        const isStudentChoice = studentSelected.includes(opt.id);
-                        const isAnswerKey = correctList.includes(opt.id);
-
-                        let badgeStyle = 'bg-slate-50 border-slate-200 text-slate-700';
-                        if (printConfig.showAnswerKey && isAnswerKey) {
-                          badgeStyle = 'bg-emerald-50 border-emerald-400 text-emerald-900 font-semibold ring-1 ring-emerald-400';
-                        }
-                        if (isStudentChoice && (!printConfig.showAnswerKey || !isAnswerKey)) {
-                          badgeStyle = printConfig.showAnswerKey ? 'bg-rose-50 border-rose-400 text-rose-900 line-through' : 'bg-sky-50 border-sky-400 text-sky-950 font-semibold';
-                        }
-
-                        return (
-                          <div
-                            key={opt.id}
-                            className={`p-2.5 rounded-lg border text-xs flex items-start gap-2 ${badgeStyle}`}
-                          >
-                            <span className="font-bold font-mono uppercase">{opt.id}.</span>
-                            <span className="flex-1"><MathContent content={opt.text} /></span>
-                            {isStudentChoice && (
-                              <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-900 text-white font-bold uppercase">
-                                Thí sinh chọn
-                              </span>
-                            )}
-                            {printConfig.showAnswerKey && isAnswerKey && (
-                              <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-700 text-white font-bold uppercase">
-                                Đáp án đúng
-                              </span>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+                    <QuestionOptions
+                      options={q.options || []}
+                      questionType={q.question_type}
+                      mode="paper"
+                      selectedOptions={studentSelected}
+                      correctAnswers={correctList}
+                      showAnswerKey={printConfig.showAnswerKey}
+                      className="mt-2"
+                    />
                   </div>
                 );
               })}
@@ -562,9 +577,9 @@ const handlePrint = () => {
         {/* PHẦN II: TRẮC NGHIỆM ĐÚNG / SAI CHUẨN BGDĐT 2025 */}
         {part2Questions.length > 0 && (
           <div className="mb-8">
-            <div className="bg-slate-900 text-white px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wider mb-4 flex justify-between items-center">
+            <div className="bg-slate-100 text-slate-800 border border-slate-300 px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wider mb-4 flex justify-between items-center">
               <span>{part1Questions.length > 0 ? 'PHẦN II. CÂU HỎI TRẮC NGHIỆM ĐÚNG / SAI' : 'CÂU HỎI TRẮC NGHIỆM ĐÚNG / SAI'} ({part2Questions.length} CÂU)</span>
-              <span>Đạt: {part2TotalScore} điểm</span>
+              <span className="text-teal-700">Đạt: {part2TotalScore} điểm</span>
             </div>
 
             <div className="space-y-6">
@@ -577,7 +592,7 @@ const handlePrint = () => {
                 let correctSubCount = 0;
                 const evaluatedItems = subOptions.map(opt => {
                   const letter = opt.id.toLowerCase();
-                  const detail = q.tf_details ? q.tf_details[letter] : null;
+                  const detail = q.tf_details ? (q.tf_details[letter] || q.tf_details[letter.toUpperCase()]) : null;
 
                   let studentChoice = null;
                   let keyChoice = null;
@@ -589,21 +604,30 @@ const handlePrint = () => {
                     isMatch = detail.isCorrect;
                   } else {
                     if (q.student_selected_options && typeof q.student_selected_options === 'object') {
-                      studentChoice = q.student_selected_options[letter];
+                      studentChoice = q.student_selected_options[letter] !== undefined
+                        ? q.student_selected_options[letter]
+                        : q.student_selected_options[letter.toUpperCase()];
                     }
                     if (q.correct_answers && typeof q.correct_answers === 'object') {
-                      keyChoice = q.correct_answers[letter];
+                      keyChoice = q.correct_answers[letter] !== undefined
+                        ? q.correct_answers[letter]
+                        : q.correct_answers[letter.toUpperCase()];
                     }
-                    isMatch = studentChoice && keyChoice && String(studentChoice).toUpperCase() === String(keyChoice).toUpperCase();
+                    const sNorm = (studentChoice === 'T' || studentChoice === 'Đ' || studentChoice === 'D' || String(studentChoice).toUpperCase() === 'TRUE') ? 'T' : (studentChoice ? 'F' : null);
+                    const kNorm = (keyChoice === 'T' || keyChoice === 'Đ' || keyChoice === 'D' || String(keyChoice).toUpperCase() === 'TRUE') ? 'T' : (keyChoice ? 'F' : null);
+                    isMatch = sNorm !== null && kNorm !== null && sNorm === kNorm;
                   }
 
                   if (isMatch) correctSubCount++;
 
+                  const isT = (val) => val === 'T' || val === 'Đ' || val === 'D' || String(val).toUpperCase() === 'TRUE';
+                  const isF = (val) => val === 'F' || val === 'S' || String(val).toUpperCase() === 'FALSE';
+
                   return {
                     id: letter,
                     text: opt.text,
-                    studentChoice: studentChoice ? (studentChoice === 'T' || studentChoice === 'Đ' ? 'ĐÚNG' : 'SAI') : 'Chưa chọn',
-                    keyChoice: keyChoice ? (keyChoice === 'T' || keyChoice === 'Đ' ? 'ĐÚNG' : 'SAI') : '-',
+                    studentChoice: isT(studentChoice) ? 'ĐÚNG' : (isF(studentChoice) ? 'SAI' : 'Chưa chọn'),
+                    keyChoice: isT(keyChoice) ? 'ĐÚNG' : (isF(keyChoice) ? 'SAI' : '-'),
                     isMatch
                   };
                 });
@@ -613,6 +637,11 @@ const handlePrint = () => {
                     <div className="flex items-start justify-between gap-3 mb-3">
                       <p className="font-bold text-slate-900 text-sm leading-snug">
                         <span className="text-teal-800">Câu {q.display_order} (Đúng/Sai):</span> <MathContent content={q.content} />
+                        {q.is_overridden && (
+                          <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-300">
+                            Đã điều chỉnh đáp án
+                          </span>
+                        )}
                       </p>
                       <span className={`px-2.5 py-1 rounded-lg text-xs font-bold flex-shrink-0 flex items-center gap-1 ${
                         q.score_obtained > 0 ? 'bg-teal-100 text-teal-900 border border-teal-300' : 'bg-slate-100 text-slate-600'
@@ -696,12 +725,126 @@ const handlePrint = () => {
           </div>
         )}
 
-        {/* PHẦN III: TỰ LUẬN */}
+        {/* PHẦN III: CÂU HỎI TRẮC NGHIỆM TRẢ LỜI NGẮN */}
+        {part3Questions.length > 0 && (
+          <div className="mb-8">
+            <div className="bg-slate-100 text-slate-800 border border-slate-300 px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wider mb-4 flex justify-between items-center">
+              <span>PHẦN III. CÂU HỎI TRẮC NGHIỆM TRẢ LỜI NGẮN ({part3Questions.length} CÂU)</span>
+              <span className="text-violet-700">Đạt: {part3TotalScore} điểm</span>
+            </div>
+
+            <div className="space-y-6">
+              {part3Questions.map((q) => {
+                const score = Number(q.score_obtained ?? 0);
+                const maxScore = Number(q.max_score ?? 0.25);
+                const isCorrect = (q.is_correct === true || q.is_correct === 1) && score >= maxScore;
+                const isPartial = score > 0 && score < maxScore;
+                const studentAns = q.student_short_answer ? String(q.student_short_answer).trim() : '';
+                const hasAnswer = studentAns.length > 0;
+
+                const correctAnswersList = Array.isArray(q.correct_answers)
+                  ? q.correct_answers
+                  : (q.correct_answers ? [q.correct_answers] : []);
+
+                return (
+                  <div key={q.id} className="print-question-item part3-question border border-slate-300 rounded-xl p-4 bg-white text-xs">
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <p className="font-bold text-slate-900 text-sm leading-snug">
+                        <span className="text-violet-800">Câu {q.display_order} (Trả lời ngắn):</span> <MathContent content={q.content} />
+                        {q.is_overridden && (
+                          <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-300">
+                            Đã điều chỉnh đáp án
+                          </span>
+                        )}
+                      </p>
+                      <span className={`px-2.5 py-1 rounded-lg text-xs font-bold flex-shrink-0 flex items-center gap-1 ${
+                        isCorrect
+                          ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                          : isPartial
+                            ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                            : hasAnswer
+                              ? 'bg-rose-100 text-rose-900 border border-rose-300'
+                              : 'bg-slate-100 text-slate-600'
+                      }`}>
+                        Điểm: {score} / {maxScore}đ
+                      </span>
+                    </div>
+
+                    {/* Câu trả lời của thí sinh & Đánh giá */}
+                    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                        <span className="text-[11px] font-bold text-slate-600 uppercase block mb-1">
+                          Câu trả lời của thí sinh:
+                        </span>
+                        <div className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                          {hasAnswer ? (
+                            <>
+                              <span className="px-2 py-0.5 bg-white border border-slate-300 rounded text-slate-900 font-mono">
+                                {studentAns}
+                              </span>
+                              {isCorrect ? (
+                                <span className="inline-flex items-center gap-1 text-emerald-700 font-bold text-xs bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                  ✓ Đúng
+                                </span>
+                              ) : isPartial ? (
+                                <span className="inline-flex items-center gap-1 text-amber-700 font-bold text-xs bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                  ⚠ Điểm một phần
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-rose-700 font-bold text-xs bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                                  ✕ Sai
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="italic text-slate-400 text-xs">Thí sinh không trả lời (Bỏ trống).</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Đáp án chuẩn (nếu bật hiển thị) */}
+                      {printConfig.showAnswerKey && (
+                        <div className="p-3 bg-blue-50/60 border border-blue-200 rounded-lg">
+                          <span className="text-[11px] font-bold text-blue-900 uppercase block mb-1">
+                            Đáp án chuẩn chấp nhận:
+                          </span>
+                          <div className="text-sm font-bold text-blue-700">
+                            {correctAnswersList.length > 0 ? (
+                              <span className="px-2 py-0.5 bg-white border border-blue-300 rounded font-mono">
+                                {correctAnswersList.join(' / ')}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 italic text-xs">-</span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Hướng dẫn chấm / Rubric nếu có */}
+                    {printConfig.showRubric && q.rubric_guide && (
+                      <div className="mt-3 p-3 bg-slate-100 border border-slate-200 rounded-lg text-[11px] text-slate-600 leading-relaxed">
+                        <span className="font-bold text-slate-700 block mb-0.5">Tiêu chí chấm / Hướng dẫn:</span>
+                        <div><MathContent content={q.rubric_guide} /></div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* PHẦN TỰ LUẬN (NẾU CÓ) */}
         {essayQuestions.length > 0 && (
           <div className="mb-8">
-            <div className="bg-slate-900 text-white px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wider mb-4 flex justify-between items-center">
-              <span>{part2Questions.length > 0 ? 'PHẦN III. CÂU HỎI TỰ LUẬN' : 'PHẦN II. CÂU HỎI TỰ LUẬN'} ({essayQuestions.length} CÂU)</span>
-              <span>Đạt: {attempt.essay_score || 0} điểm</span>
+            <div className="bg-slate-100 text-slate-800 border border-slate-300 px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wider mb-4 flex justify-between items-center">
+              <span>
+                {part3Questions.length > 0
+                  ? 'PHẦN IV. CÂU HỎI TỰ LUẬN'
+                  : (part2Questions.length > 0 ? 'PHẦN III. CÂU HỎI TỰ LUẬN' : 'PHẦN II. CÂU HỎI TỰ LUẬN')} ({essayQuestions.length} CÂU)
+              </span>
+              <span className="text-amber-800">Đạt: {attempt.essay_score || 0} điểm</span>
             </div>
 
             <div className="space-y-6">
@@ -784,7 +927,7 @@ const handlePrint = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm overflow-y-auto p-4 sm:p-6 print:static print:h-auto print:overflow-visible print:p-0 print:bg-white print-modal-overlay">
+    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs overflow-y-auto p-4 sm:p-6 print:static print:h-auto print:overflow-visible print:p-0 print:bg-white print-modal-overlay">
       {/* Global CSS overrides when printing natively or via Ctrl+P */}
       <style id="print-isolation-style">{`
         @media print {
@@ -837,7 +980,7 @@ const handlePrint = () => {
             page-break-after: auto !important;
             break-after: auto !important;
           }
-          .print-question-item {
+          .print-question-item, .part3-question {
             page-break-inside: avoid !important;
             break-inside: avoid !important;
           }
@@ -845,16 +988,16 @@ const handlePrint = () => {
       `}</style>
 
       {/* Top Floating Control Bar (Hidden when printing) */}
-      <div id="print-controls-bar" className="sticky top-0 z-50 max-w-4xl mx-auto bg-slate-900 border border-slate-700 rounded-2xl p-4 mb-6 shadow-2xl flex flex-wrap items-center justify-between gap-4 print:hidden">
-        <div className="flex items-center gap-3 text-white">
-          <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center font-bold shadow">
-            <FileText className="w-5 h-5 text-white" />
+      <div id="print-controls-bar" className="sticky top-0 z-50 max-w-4xl mx-auto bg-white border border-slate-200 rounded-2xl p-4 mb-6 shadow-xl flex flex-wrap items-center justify-between gap-4 print:hidden">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center font-bold shadow-2xs">
+            <FileText className="w-5 h-5 text-blue-600" />
           </div>
           <div>
-            <h3 className="font-bold text-sm">
+            <h3 className="font-bold text-sm text-slate-900">
               {isBatchMode ? 'In Toàn Bộ Bài Thi Cả Ca Thi' : 'Bản In Bài Làm Chi Tiết Thí Sinh'}
             </h3>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-500">
               {isBatchMode ? `Tổng số: ${data?.papers?.length || 0} bài làm` : `${data?.attempt?.student_name} (${data?.attempt?.student_code})`}
             </p>
           </div>
@@ -864,35 +1007,44 @@ const handlePrint = () => {
           {/* Nút Cấu Hình Mẫu In */}
           <button
             onClick={handleOpenConfigModal}
-            className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl text-xs transition border border-slate-700 shadow flex items-center gap-1.5"
+            className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 font-semibold rounded-xl text-xs transition border border-slate-200 shadow-2xs flex items-center gap-1.5"
             title="Cấu hình thông tin trường, tiêu đề và xuất/nhập file mẫu cấu hình in"
           >
-            <Settings className="w-4 h-4 text-amber-400" /> Mẫu In & Cấu Hình
+            <Settings className="w-4 h-4 text-amber-500" /> Mẫu In & Cấu Hình
           </button>
           <button
             onClick={handlePrint}
-            className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs transition shadow-lg flex items-center gap-1.5 border border-rose-400/30"
+            className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs transition shadow-md shadow-rose-600/20 flex items-center gap-1.5"
             title="Mở hộp thoại In của máy tính và lưu bài làm dưới dạng tệp PDF khổ A4"
           >
             <Printer className="w-4 h-4" /> Xuất / Lưu File PDF (A4)
           </button>
           <button
             onClick={handleOpenNewWindowPrint}
-            className="px-3.5 py-2 bg-sky-700 hover:bg-sky-600 text-white font-semibold rounded-xl text-xs transition shadow flex items-center gap-1.5"
+            className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-xs transition shadow-2xs flex items-center gap-1.5"
             title="Mở toàn bộ bài thi trong tab mới để xem toàn màn hình và in/lưu PDF"
           >
             <ExternalLink className="w-4 h-4" /> Mở Tab In Trực Tiếp
           </button>
           <button
             onClick={handleDownloadHtml}
-            className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-600 text-white font-semibold rounded-xl text-xs transition shadow flex items-center gap-1.5"
+            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl text-xs transition shadow-2xs flex items-center gap-1.5"
             title="Tải về tệp HTML độc lập chứa đầy đủ công thức toán và bài làm để lưu trữ offline"
           >
             <Download className="w-4 h-4" /> Tải File HTML Lưu Trữ
           </button>
+          {isBatchMode && (
+            <button
+              onClick={() => window.open(`/api/teacher/sessions/${sessionId}/export-submissions-zip`, '_blank')}
+              className="px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl text-xs transition shadow-2xs flex items-center gap-1.5"
+              title="Tải về 1 tệp ZIP chứa tách riêng từng bài làm của từng thí sinh theo Số Báo Danh (khổ A4 kèm bảng điểm)"
+            >
+              <Archive className="w-4 h-4 text-white" /> Tải ZIP Tách Riêng Từng SBD
+            </button>
+          )}
           <button
             onClick={onClose}
-            className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition"
+            className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 rounded-xl transition"
             title="Đóng cửa sổ"
           >
             <X className="w-5 h-5" />
@@ -901,9 +1053,9 @@ const handlePrint = () => {
       </div>
 
       {/* Hướng dẫn lưu file PDF */}
-      <div className="max-w-4xl mx-auto mb-6 bg-sky-950/60 border border-sky-800/80 rounded-xl p-3.5 text-xs text-sky-200 flex items-center justify-between gap-3 shadow-md print:hidden">
+      <div className="max-w-4xl mx-auto mb-6 bg-blue-50 border border-blue-200 rounded-xl p-3.5 text-xs text-blue-800 flex items-center justify-between gap-3 shadow-2xs print:hidden">
         <div className="flex items-center gap-2.5">
-          <span className="p-1.5 bg-sky-900 text-sky-300 rounded-lg font-bold">💡</span>
+          <span className="p-1.5 bg-blue-100 text-blue-700 rounded-lg font-bold">💡</span>
           <span>
             <strong>Hướng dẫn lưu trữ file PDF:</strong> Khi bấm <strong>"Xuất / Lưu File PDF (A4)"</strong>, tại mục <strong>Máy in (Destination)</strong> của trình duyệt ➔ Chọn <strong>"Lưu dưới dạng PDF" (Save as PDF)</strong> ➔ Đặt khổ giấy <strong>A4</strong> ➔ Nhấn <strong>Lưu (Save)</strong>.
           </span>
@@ -932,16 +1084,16 @@ const handlePrint = () => {
 
       {/* MODAL CẤU HÌNH MẪU IN (EXPORT/IMPORT JSON CONFIG TEMPLATE) */}
       {showConfigModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 print:hidden">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <Settings className="w-5 h-5 text-amber-400" />
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 print:hidden">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <Settings className="w-5 h-5 text-amber-500" />
                 Cấu Hình Mẫu In & Tiêu Đề Bài Thi
               </h3>
               <button
                 onClick={() => setShowConfigModal(false)}
-                className="text-slate-400 hover:text-white text-lg"
+                className="text-slate-400 hover:text-slate-600 text-lg transition"
               >
                 ✕
               </button>
@@ -949,7 +1101,7 @@ const handlePrint = () => {
 
             <div className="space-y-3.5 max-h-[65vh] overflow-y-auto pr-1">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
                   Đơn vị cấp trên (Sở / Phòng GD&ĐT):
                 </label>
                 <input
@@ -957,12 +1109,12 @@ const handlePrint = () => {
                   value={tempConfig.department}
                   onChange={e => setTempConfig({ ...tempConfig, department: e.target.value })}
                   placeholder="Ví dụ: SỞ GD&ĐT • PHÒNG KHẢO THÍ"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs"
+                  className="w-full bg-white border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl px-3 py-2 text-slate-800 text-xs outline-none transition shadow-2xs"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
                   Tên Trường / Trung Tâm Đào Tạo:
                 </label>
                 <input
@@ -970,13 +1122,13 @@ const handlePrint = () => {
                   value={tempConfig.schoolName}
                   onChange={e => setTempConfig({ ...tempConfig, schoolName: e.target.value })}
                   placeholder="Ví dụ: TRƯỜNG THCS - THPT ĐẶNG CHÍ THANH"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs font-semibold"
+                  className="w-full bg-white border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl px-3 py-2 text-slate-900 text-xs font-semibold outline-none transition shadow-2xs"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
                     Dòng phụ đề:
                   </label>
                   <input
@@ -984,11 +1136,11 @@ const handlePrint = () => {
                     value={tempConfig.subTitle}
                     onChange={e => setTempConfig({ ...tempConfig, subTitle: e.target.value })}
                     placeholder="Hệ thống khảo thí mạng LAN"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs"
+                    className="w-full bg-white border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl px-3 py-2 text-slate-800 text-xs outline-none transition shadow-2xs"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
                     Chức danh Giám khảo ký tên:
                   </label>
                   <input
@@ -996,13 +1148,13 @@ const handlePrint = () => {
                     value={tempConfig.examinerTitle}
                     onChange={e => setTempConfig({ ...tempConfig, examinerTitle: e.target.value })}
                     placeholder="Giáo Viên Bộ Môn"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs"
+                    className="w-full bg-white border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl px-3 py-2 text-slate-800 text-xs outline-none transition shadow-2xs"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
                   Tiêu đề chính của bài thi:
                 </label>
                 <input
@@ -1010,12 +1162,12 @@ const handlePrint = () => {
                   value={tempConfig.paperTitle}
                   onChange={e => setTempConfig({ ...tempConfig, paperTitle: e.target.value })}
                   placeholder="BÀI THI KIỂM TRA TRÊN MÁY TÍNH"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs font-bold"
+                  className="w-full bg-white border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl px-3 py-2 text-slate-900 text-xs font-bold outline-none transition shadow-2xs"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
                   Ghi chú chân trang (tùy chọn):
                 </label>
                 <input
@@ -1023,64 +1175,64 @@ const handlePrint = () => {
                   value={tempConfig.noteFooter}
                   onChange={e => setTempConfig({ ...tempConfig, noteFooter: e.target.value })}
                   placeholder="Ví dụ: Mọi thắc mắc về điểm số vui lòng phản hồi trong 48h."
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs"
+                  className="w-full bg-white border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl px-3 py-2 text-slate-800 text-xs outline-none transition shadow-2xs"
                 />
               </div>
 
               {/* Checkboxes for options */}
-              <div className="bg-slate-800/60 p-3 rounded-xl border border-slate-700 space-y-2">
-                <span className="block text-xs font-bold text-amber-400 uppercase mb-1">
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2.5">
+                <span className="block text-xs font-bold text-slate-700 uppercase mb-1">
                   Tùy Chọn Chi Tiết Trên Bản In:
                 </span>
-                <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-300">
+                <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-700 font-medium">
                   <input
                     type="checkbox"
                     checked={tempConfig.showRubric}
                     onChange={e => setTempConfig({ ...tempConfig, showRubric: e.target.checked })}
-                    className="rounded bg-slate-900 border-slate-700 text-sky-600 focus:ring-0"
+                    className="rounded bg-white border-slate-300 text-blue-600 focus:ring-0"
                   />
                   In kèm Barem điểm chi tiết của câu hỏi Tự Luận
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-300">
+                <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-700 font-medium">
                   <input
                     type="checkbox"
                     checked={tempConfig.showAnswerKey}
                     onChange={e => setTempConfig({ ...tempConfig, showAnswerKey: e.target.checked })}
-                    className="rounded bg-slate-900 border-slate-700 text-sky-600 focus:ring-0"
+                    className="rounded bg-white border-slate-300 text-blue-600 focus:ring-0"
                   />
                   Đánh dấu Đáp Án Đúng ở phần Trắc Nghiệm
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-300">
+                <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-700 font-medium">
                   <input
                     type="checkbox"
                     checked={tempConfig.showStudentSignature}
                     onChange={e => setTempConfig({ ...tempConfig, showStudentSignature: e.target.checked })}
-                    className="rounded bg-slate-900 border-slate-700 text-sky-600 focus:ring-0"
+                    className="rounded bg-white border-slate-300 text-blue-600 focus:ring-0"
                   />
                   Hiển thị khung chữ ký Thí sinh
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-300">
+                <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-700 font-medium">
                   <input
                     type="checkbox"
                     checked={tempConfig.showExaminerSignature}
                     onChange={e => setTempConfig({ ...tempConfig, showExaminerSignature: e.target.checked })}
-                    className="rounded bg-slate-900 border-slate-700 text-sky-600 focus:ring-0"
+                    className="rounded bg-white border-slate-300 text-blue-600 focus:ring-0"
                   />
                   Hiển thị khung chữ ký Giám khảo
                 </label>
               </div>
 
               {/* Export / Import Template Section */}
-              <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex flex-wrap items-center justify-between gap-2">
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <span className="text-xs font-bold text-slate-300 block">File Mẫu Cấu Hình:</span>
-                  <span className="text-[10px] text-slate-400">Lưu ra file .json để dùng cho các máy khác</span>
+                  <span className="text-xs font-bold text-slate-800 block">File Mẫu Cấu Hình:</span>
+                  <span className="text-[10px] text-slate-500">Lưu ra file .json để dùng cho các máy khác</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={handleExportConfigFile}
-                    className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-700 rounded-lg text-xs font-medium flex items-center gap-1 transition"
+                    className="px-2.5 py-1.5 bg-white hover:bg-slate-100 text-blue-700 border border-slate-200 rounded-lg text-xs font-medium flex items-center gap-1 transition shadow-2xs"
                     title="Tải về file cấu hình CauHinh_MauIn_BaiThi.json"
                   >
                     <Download className="w-3.5 h-3.5" /> Xuất File Mẫu (.json)
@@ -1088,7 +1240,7 @@ const handlePrint = () => {
                   <button
                     type="button"
                     onClick={() => fileInputRef.current && fileInputRef.current.click()}
-                    className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700 rounded-lg text-xs font-medium flex items-center gap-1 transition"
+                    className="px-2.5 py-1.5 bg-white hover:bg-slate-100 text-emerald-700 border border-slate-200 rounded-lg text-xs font-medium flex items-center gap-1 transition shadow-2xs"
                     title="Nhập file cấu hình .json từ máy tính"
                   >
                     <Upload className="w-3.5 h-3.5" /> Nhập File Mẫu
@@ -1105,11 +1257,11 @@ const handlePrint = () => {
             </div>
 
             {/* Bottom Actions */}
-            <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
               <button
                 type="button"
                 onClick={handleResetDefaultConfig}
-                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-xl text-xs font-medium flex items-center gap-1 transition"
+                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-800 rounded-xl text-xs font-medium flex items-center gap-1 transition"
                 title="Khôi phục về thông số mẫu mặc định"
               >
                 <RotateCcw className="w-3.5 h-3.5" /> Đặt Lại Mặc Định
@@ -1119,14 +1271,14 @@ const handlePrint = () => {
                 <button
                   type="button"
                   onClick={() => setShowConfigModal(false)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition"
                 >
                   Hủy
                 </button>
                 <button
                   type="button"
                   onClick={handleApplyConfig}
-                  className="px-5 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-xs shadow flex items-center gap-1.5 transition"
+                  className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs shadow-xs flex items-center gap-1.5 transition"
                 >
                   {configSavedNotice ? <Check className="w-4 h-4 text-white" /> : <Save className="w-4 h-4" />}
                   {configSavedNotice ? 'Đã Lưu Thành Công!' : 'Lưu & Áp Dụng'}

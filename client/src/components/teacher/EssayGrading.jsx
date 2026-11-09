@@ -201,20 +201,20 @@ export default function EssayGrading({ sessionId, onBack, onOpenResults }) {
   return (
     <div className="space-y-6">
       {/* Top Header */}
-      <div className="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-lg flex flex-wrap items-center justify-between gap-4">
+      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <button
             onClick={onBack}
-            className="p-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition"
+            className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition"
             title="Quay lại"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <FileEdit className="w-5 h-5 text-amber-400" /> Bàn Chấm Thi Tự Luận Chuyên Dụng
+            <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+              <FileEdit className="w-5 h-5 text-amber-500" /> Bàn Chấm Thi Tự Luận Chuyên Dụng
             </h2>
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="text-xs text-slate-500 mt-1">
               Chấm từng câu theo từng thí sinh, tự động chuyển câu thông minh và tính điểm tức thì
             </p>
           </div>
@@ -222,14 +222,14 @@ export default function EssayGrading({ sessionId, onBack, onOpenResults }) {
 
         <div className="flex items-center gap-4">
           <div className="text-right">
-            <p className="text-xs text-slate-400 font-semibold uppercase">Tiến Độ Chấm Ca Thi</p>
-            <p className="text-sm font-bold text-emerald-400">
+            <p className="text-xs text-slate-500 font-semibold uppercase">Tiến Độ Chấm Ca Thi</p>
+            <p className="text-sm font-bold text-emerald-600">
               {fullyGradedStudents}/{totalStudents} thí sinh ({gradedSubmissionsCount}/{totalSubmissionsCount} câu - {progressPct}%)
             </p>
           </div>
           <button
             onClick={() => onOpenResults(sessionId)}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition shadow flex items-center gap-2"
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition shadow-xs flex items-center gap-2"
           >
             <Download className="w-4 h-4" /> Báo Cáo & Xuất Excel
           </button>
@@ -237,20 +237,20 @@ export default function EssayGrading({ sessionId, onBack, onOpenResults }) {
       </div>
 
       {loading ? (
-        <div className="p-12 text-center text-slate-400">Đang tải danh sách bài làm tự luận...</div>
+        <div className="p-12 text-center text-slate-500">Đang tải danh sách bài làm tự luận...</div>
       ) : submissions.length === 0 ? (
-        <div className="bg-slate-800/80 border border-slate-700 rounded-xl p-12 text-center text-slate-400">
-          <FileEdit className="w-12 h-12 mx-auto text-slate-600 mb-3" />
-          <p className="text-base font-semibold text-slate-300">Không có câu hỏi tự luận nào cần chấm trong ca thi này.</p>
+        <div className="bg-white border border-slate-200 rounded-xl p-12 text-center text-slate-600 shadow-xs">
+          <FileEdit className="w-12 h-12 mx-auto text-slate-400 mb-3" />
+          <p className="text-base font-semibold text-slate-800">Không có câu hỏi tự luận nào cần chấm trong ca thi này.</p>
           <p className="text-xs text-slate-500 mt-1">Đề thi của ca này chỉ có các câu hỏi trắc nghiệm đã được hệ thống tự động chấm 100%.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Left Sidebar: Students List */}
-          <div className="lg:col-span-1 bg-slate-800/80 border border-slate-700 rounded-xl p-4 flex flex-col h-[750px]">
+          <div className="lg:col-span-1 bg-white border border-slate-200 rounded-xl p-4 flex flex-col h-[750px] shadow-xs">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="font-bold text-white text-sm flex items-center gap-1.5">
-                <User className="w-4 h-4 text-sky-400" /> Danh Sách Thí Sinh ({students.length})
+              <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+                <User className="w-4 h-4 text-blue-600" /> Danh Sách Thí Sinh ({students.length})
               </h3>
             </div>
 
@@ -260,26 +260,26 @@ export default function EssayGrading({ sessionId, onBack, onOpenResults }) {
               placeholder="Tìm SBD hoặc Họ tên..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 mb-2.5"
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white mb-2.5 transition"
             />
 
             {/* Filter Tabs */}
-            <div className="grid grid-cols-3 gap-1 bg-slate-900 p-1 rounded-lg mb-3 text-[11px] font-semibold">
+            <div className="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-lg mb-3 text-[11px] font-semibold">
               <button
                 onClick={() => setFilterStatus('all')}
-                className={`py-1 rounded text-center transition ${filterStatus === 'all' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                className={`py-1 rounded text-center transition ${filterStatus === 'all' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800'}`}
               >
                 Tất cả ({students.length})
               </button>
               <button
                 onClick={() => setFilterStatus('ungraded')}
-                className={`py-1 rounded text-center transition ${filterStatus === 'ungraded' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                className={`py-1 rounded text-center transition ${filterStatus === 'ungraded' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800'}`}
               >
                 Chưa xong ({students.length - fullyGradedStudents})
               </button>
               <button
                 onClick={() => setFilterStatus('graded')}
-                className={`py-1 rounded text-center transition ${filterStatus === 'graded' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                className={`py-1 rounded text-center transition ${filterStatus === 'graded' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800'}`}
               >
                 Đã xong ({fullyGradedStudents})
               </button>
@@ -299,34 +299,34 @@ export default function EssayGrading({ sessionId, onBack, onOpenResults }) {
                   <button
                     key={st.attempt_id}
                     onClick={() => handleSelectStudent(st)}
-                    className={`w-full text-left p-3 rounded-lg border transition text-xs flex flex-col justify-between ${
+                    className={`w-full text-left p-3 rounded-xl border transition text-xs flex flex-col justify-between shadow-2xs ${
                       isSelected
-                        ? 'bg-amber-950/40 border-amber-500 ring-1 ring-amber-500'
+                        ? 'bg-amber-50/80 border-amber-400 ring-2 ring-amber-400/20'
                         : isAllGraded
-                        ? 'bg-slate-900/80 border-slate-700 hover:border-slate-600'
-                        : 'bg-slate-900/90 border-slate-700 hover:border-amber-600'
+                        ? 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                        : 'bg-white border-slate-200 hover:border-amber-400 hover:bg-amber-50/20'
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-mono font-bold text-sky-400">{st.student_code}</span>
+                      <span className="font-mono font-bold text-blue-600">{st.student_code}</span>
                       {isAllGraded ? (
-                        <span className="px-1.5 py-0.5 bg-emerald-950 text-emerald-400 border border-emerald-800 rounded font-bold text-[10px]">
+                        <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded font-bold text-[10px]">
                           ✓ Đạt: {totalEssayScore}/{maxPossible}đ
                         </span>
                       ) : gradedQ > 0 ? (
-                        <span className="px-1.5 py-0.5 bg-amber-950 text-amber-300 border border-amber-800 rounded font-semibold text-[10px]">
+                        <span className="px-1.5 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded font-semibold text-[10px]">
                           Đang chấm: {gradedQ}/{totalQ} câu
                         </span>
                       ) : (
-                        <span className="px-1.5 py-0.5 bg-rose-950 text-rose-400 border border-rose-800 rounded text-[10px]">
+                        <span className="px-1.5 py-0.5 bg-rose-50 text-rose-600 border border-rose-200 rounded text-[10px]">
                           Chưa chấm (0/{totalQ})
                         </span>
                       )}
                     </div>
-                    <p className="text-slate-200 font-semibold mt-1 truncate">{st.student_name}</p>
-                    <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1">
+                    <p className="text-slate-800 font-bold mt-1 truncate">{st.student_name}</p>
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 mt-1">
                       <span>Lớp: {st.class_name || 'N/A'}</span>
-                      <span className="font-mono text-[10px] text-slate-500">{st.client_ip || ''}</span>
+                      <span className="font-mono text-[10px] text-slate-400">{st.client_ip || ''}</span>
                     </div>
                   </button>
                 );
@@ -336,28 +336,28 @@ export default function EssayGrading({ sessionId, onBack, onOpenResults }) {
 
           {/* Main Workbench (Right 3 cols) */}
           {currentStudent && currentSub ? (
-            <div className="lg:col-span-3 bg-slate-800/90 border border-slate-700 rounded-xl p-6 flex flex-col h-[750px] overflow-hidden">
+            <div className="lg:col-span-3 bg-white border border-slate-200 rounded-xl p-6 flex flex-col h-[750px] overflow-hidden shadow-xs">
               {/* Student Header Bar */}
-              <div className="bg-slate-900 border border-slate-700 rounded-xl p-4 mb-4 flex flex-wrap items-center justify-between gap-3 shadow">
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-sky-950 border border-sky-800 flex items-center justify-center font-bold text-sky-400 text-sm">
+                  <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center font-bold text-blue-600 text-sm shadow-2xs">
                     {currentStudent.student_code.slice(-3)}
                   </div>
                   <div>
-                    <h3 className="text-white font-bold text-base flex items-center gap-2">
+                    <h3 className="text-slate-900 font-bold text-base flex items-center gap-2">
                       {currentStudent.student_name}
-                      <span className="text-xs px-2 py-0.5 bg-slate-800 text-sky-300 rounded font-mono font-normal">
+                      <span className="text-xs px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded font-mono font-medium">
                         SBD: {currentStudent.student_code}
                       </span>
                       {currentStudent.class_name && (
-                        <span className="text-xs px-2 py-0.5 bg-slate-800 text-slate-300 rounded font-normal">
+                        <span className="text-xs px-2 py-0.5 bg-slate-200/80 text-slate-700 rounded font-medium">
                           Lớp: {currentStudent.class_name}
                         </span>
                       )}
                     </h3>
-                    <p className="text-xs text-slate-400 mt-0.5">
+                    <p className="text-xs text-slate-500 mt-0.5">
                       Tổng điểm tự luận hiện tại:{' '}
-                      <strong className="text-amber-400 font-mono text-sm">
+                      <strong className="text-amber-600 font-mono text-sm font-bold">
                         {Math.round(currentQuestions.reduce((sum, q) => sum + (q.manual_score || 0), 0) * 100) / 100}
                       </strong>{' '}
                       / {Math.round(currentQuestions.reduce((sum, q) => sum + (q.question_max_score || 0), 0) * 100) / 100} điểm
@@ -369,7 +369,7 @@ export default function EssayGrading({ sessionId, onBack, onOpenResults }) {
                   <button
                     type="button"
                     onClick={() => setViewingAttemptId(currentStudent.attempt_id)}
-                    className="px-3 py-1.5 bg-sky-950 hover:bg-sky-900 text-sky-300 border border-sky-800 rounded-lg text-xs font-semibold transition flex items-center gap-1.5"
+                    className="px-3 py-1.5 bg-white hover:bg-slate-50 text-blue-600 border border-slate-200 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 shadow-2xs"
                     title="Xem toàn bộ bài làm, in ấn A4 hoặc tải file HTML của thí sinh này"
                   >
                     <FileText className="w-4 h-4" /> Xem Toàn Bộ Bài Thi
@@ -389,19 +389,19 @@ export default function EssayGrading({ sessionId, onBack, onOpenResults }) {
                       onClick={() => handleSelectQuestion(q)}
                       className={`px-3.5 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 border flex-shrink-0 ${
                         isCurrent
-                          ? 'bg-amber-600 text-white border-amber-500 shadow-md ring-2 ring-amber-500/30'
+                          ? 'bg-amber-600 text-white border-amber-600 shadow-xs ring-2 ring-amber-500/20'
                           : isQGraded
-                          ? 'bg-slate-900 text-emerald-400 border-emerald-900/60 hover:bg-slate-800'
-                          : 'bg-slate-900 text-slate-300 border-slate-700 hover:border-amber-600'
+                          ? 'bg-slate-50 text-emerald-700 border-slate-200 hover:bg-slate-100'
+                          : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-amber-400 hover:bg-amber-50/20'
                       }`}
                     >
                       <span>Câu {q.order_index || idx + 1} ({q.question_max_score}đ)</span>
                       {isQGraded ? (
-                        <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${isCurrent ? 'bg-amber-800 text-amber-100' : 'bg-emerald-950 text-emerald-300'}`}>
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${isCurrent ? 'bg-amber-700 text-white' : 'bg-emerald-100 text-emerald-800'}`}>
                           {q.manual_score}đ
                         </span>
                       ) : (
-                        <span className="px-1.5 py-0.2 bg-rose-950 text-rose-300 rounded text-[10px]">
+                        <span className="px-1.5 py-0.5 bg-rose-100 text-rose-700 rounded text-[10px]">
                           Chưa chấm
                         </span>
                       )}
@@ -411,13 +411,13 @@ export default function EssayGrading({ sessionId, onBack, onOpenResults }) {
               </div>
 
               {/* Question Statement Card */}
-              <div className="bg-slate-900 border border-slate-700 rounded-lg p-3.5 mb-4">
-                <div className="flex items-center justify-between gap-2 mb-1.5">
-                  <span className="px-2 py-0.5 bg-amber-950 text-amber-400 border border-amber-800 rounded font-bold text-xs">
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4 shadow-2xs">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <span className="px-2 py-0.5 bg-amber-100 text-amber-800 border border-amber-200 rounded font-bold text-xs">
                     CÂU {currentSub.order_index} (Tự Luận - Tối Đa: {currentSub.question_max_score} điểm)
                   </span>
                 </div>
-                <div className="text-white font-medium text-sm leading-relaxed">
+                <div className="text-slate-800 font-medium text-sm leading-relaxed">
                   <MathContent content={currentSub.question_content} />
                 </div>
               </div>
@@ -425,19 +425,19 @@ export default function EssayGrading({ sessionId, onBack, onOpenResults }) {
               {/* 2-Column Split: Student Answer (Left) vs Rubric & Grading Inputs (Right) */}
               <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 overflow-hidden">
                 {/* Student Essay Content */}
-                <div className="bg-slate-900 border border-slate-700 rounded-lg p-4 flex flex-col overflow-hidden">
-                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800">
-                    <span className="text-xs font-bold text-slate-300">BÀI LÀM CỦA THÍ SINH:</span>
-                    <span className="text-[11px] text-slate-400 font-mono">
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col overflow-hidden shadow-2xs">
+                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-200">
+                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wide">BÀI LÀM CỦA THÍ SINH:</span>
+                    <span className="text-[11px] text-slate-500 font-mono">
                       {currentSub.essay_content ? currentSub.essay_content.trim().split(/\s+/).filter(Boolean).length : 0} từ | {currentSub.essay_content ? currentSub.essay_content.length : 0} ký tự
                     </span>
                   </div>
-                  <div className="flex-1 overflow-y-auto whitespace-pre-wrap text-sm text-slate-200 leading-relaxed font-sans pr-2">
+                  <div className="flex-1 overflow-y-auto whitespace-pre-wrap text-sm text-slate-800 leading-relaxed font-sans pr-2">
                     {currentSub.essay_content && currentSub.essay_content.trim() ? (
                       <MathContent content={currentSub.essay_content} />
                     ) : (
-                      <div className="p-6 text-center text-slate-500 italic bg-slate-950/40 rounded-lg border border-dashed border-slate-800">
-                        <AlertCircle className="w-8 h-8 mx-auto text-slate-600 mb-2" />
+                      <div className="p-6 text-center text-slate-400 italic bg-white rounded-lg border border-dashed border-slate-200">
+                        <AlertCircle className="w-8 h-8 mx-auto text-slate-400 mb-2" />
                         Thí sinh không làm câu này (Bỏ trống).
                       </div>
                     )}
@@ -445,14 +445,14 @@ export default function EssayGrading({ sessionId, onBack, onOpenResults }) {
                 </div>
 
                 {/* Rubric Guide & Grading Box */}
-                <form onSubmit={handleSaveGrade} className="bg-slate-900 border border-slate-700 rounded-lg p-4 flex flex-col overflow-hidden">
+                <form onSubmit={handleSaveGrade} className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col overflow-hidden shadow-2xs">
                   {/* Rubric Guide */}
                   <div className="flex-1 overflow-y-auto pr-2 space-y-3">
-                    <div className="bg-amber-950/20 border border-amber-800/40 rounded-lg p-3">
-                      <h5 className="text-xs font-bold text-amber-400 flex items-center gap-1.5 mb-1.5">
+                    <div className="bg-amber-50/70 border border-amber-200 rounded-lg p-3">
+                      <h5 className="text-xs font-bold text-amber-800 flex items-center gap-1.5 mb-1.5">
                         <HelpCircle className="w-3.5 h-3.5" /> Barem Chấm & Đáp Án Mẫu:
                       </h5>
-                      <div className="text-xs text-amber-200/90 leading-relaxed font-sans">
+                      <div className="text-xs text-amber-900 leading-relaxed font-sans">
                         <MathContent content={currentSub.rubric_guide || 'Không có hướng dẫn chấm kèm theo.'} />
                       </div>
                     </div>
@@ -460,7 +460,7 @@ export default function EssayGrading({ sessionId, onBack, onOpenResults }) {
                     {/* Inputs */}
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <label className="text-xs font-bold text-slate-300 uppercase">
+                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                           Điểm Chấm (0.0 ➔ {currentSub.question_max_score}đ)
                         </label>
                         {/* Quick score buttons */}
@@ -468,21 +468,21 @@ export default function EssayGrading({ sessionId, onBack, onOpenResults }) {
                           <button
                             type="button"
                             onClick={() => handleSetQuickScore(0)}
-                            className="px-2 py-0.5 bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-800 rounded text-[11px] font-bold"
+                            className="px-2 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded text-[11px] font-bold transition shadow-2xs"
                           >
                             0đ
                           </button>
                           <button
                             type="button"
                             onClick={() => handleSetQuickScore(Math.round((currentSub.question_max_score / 2) * 10) / 10)}
-                            className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded text-[11px] font-bold"
+                            className="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded text-[11px] font-bold transition shadow-2xs"
                           >
                             50% ({Math.round((currentSub.question_max_score / 2) * 10) / 10}đ)
                           </button>
                           <button
                             type="button"
                             onClick={() => handleSetQuickScore(currentSub.question_max_score)}
-                            className="px-2 py-0.5 bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-800 rounded text-[11px] font-bold"
+                            className="px-2 py-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded text-[11px] font-bold transition shadow-2xs"
                           >
                             Tối đa ({currentSub.question_max_score}đ)
                           </button>
@@ -496,13 +496,13 @@ export default function EssayGrading({ sessionId, onBack, onOpenResults }) {
                         value={manualScore}
                         onChange={e => setManualScore(e.target.value)}
                         placeholder={`Nhập điểm 0.0 - ${currentSub.question_max_score}`}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono text-lg font-bold focus:border-amber-500 focus:outline-none"
+                        className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-slate-900 font-mono text-lg font-bold focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 focus:outline-none transition shadow-2xs"
                         required
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-300 uppercase mb-1">
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                         Nhận Xét / Lời Phê Cho Thí Sinh:
                       </label>
                       <textarea
@@ -511,17 +511,17 @@ export default function EssayGrading({ sessionId, onBack, onOpenResults }) {
                         placeholder="Nhập lời phê, nhận xét ưu/nhược điểm bài làm..."
                         rows={3}
                         style={{ resize: 'vertical', minHeight: '75px' }}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white text-xs focus:border-amber-500 focus:outline-none resize-y"
+                        className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-slate-800 text-xs focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 focus:outline-none transition resize-y shadow-2xs"
                       />
                     </div>
                   </div>
 
                   {/* Submit Grade */}
-                  <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
+                  <div className="pt-3 border-t border-slate-200 flex items-center justify-between gap-2">
                     <button
                       type="submit"
                       disabled={saving}
-                      className="flex-1 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-lg text-sm transition flex items-center justify-center gap-2 shadow"
+                      className="flex-1 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-sm transition flex items-center justify-center gap-2 shadow-xs"
                     >
                       <Save className="w-4 h-4" /> {saving ? 'Đang lưu...' : 'Lưu Điểm & Chấm Tiếp ➔'}
                     </button>
@@ -530,7 +530,7 @@ export default function EssayGrading({ sessionId, onBack, onOpenResults }) {
               </div>
             </div>
           ) : (
-            <div className="lg:col-span-3 bg-slate-800/80 border border-slate-700 rounded-xl p-12 text-center text-slate-400">
+            <div className="lg:col-span-3 bg-white border border-slate-200 rounded-xl p-12 text-center text-slate-500 shadow-xs">
               Chọn một thí sinh ở cột bên trái để bắt đầu chấm bài.
             </div>
           )}

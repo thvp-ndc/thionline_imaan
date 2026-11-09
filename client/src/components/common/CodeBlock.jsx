@@ -1,6 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-python';
+import 'prismjs/components/prism-clike';
+import 'prismjs/components/prism-c';
+import 'prismjs/components/prism-cpp';
 import { Check, Copy, Code2 } from 'lucide-react';
 
 /**
@@ -16,6 +19,7 @@ export default function CodeBlock({ code = '', language = 'python', showLineNumb
   const langKey = useMemo(() => {
     const raw = (language || 'python').toLowerCase().trim();
     if (raw === 'py') return 'python';
+    if (raw === 'cpp' || raw === 'c++' || raw === 'c') return 'cpp';
     if (raw === 'html' || raw === 'htm' || raw === 'xml') return 'markup';
     if (raw === 'js') return 'javascript';
     return raw;
@@ -24,6 +28,8 @@ export default function CodeBlock({ code = '', language = 'python', showLineNumb
   const displayLangName = useMemo(() => {
     if (langKey === 'markup') return 'HTML';
     if (langKey === 'python') return 'PYTHON';
+    if (langKey === 'cpp') return 'C++';
+    if (langKey === 'javascript') return 'JAVASCRIPT';
     return langKey.toUpperCase();
   }, [langKey]);
 
@@ -63,7 +69,11 @@ export default function CodeBlock({ code = '', language = 'python', showLineNumb
           <span className={`font-mono font-bold text-[11px] px-2 py-0.5 rounded ${
             langKey === 'python'
               ? 'bg-blue-950 text-blue-300 border border-blue-800/60'
-              : 'bg-amber-950 text-amber-300 border border-amber-800/60'
+              : langKey === 'cpp'
+              ? 'bg-emerald-950 text-emerald-300 border border-emerald-800/60'
+              : langKey === 'markup'
+              ? 'bg-amber-950 text-amber-300 border border-amber-800/60'
+              : 'bg-slate-800 text-slate-300 border border-slate-700'
           }`}>
             {displayLangName}
           </span>
