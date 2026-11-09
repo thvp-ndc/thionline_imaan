@@ -15,7 +15,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const authHeader = req.headers['authorization'] || '';
+    const authHeader = req.headers['authorization'] || req.headers['Authorization'] || '';
     const token = authHeader.startsWith('Bearer ')
       ? authHeader.slice(7).trim()
       : (req.query?.token || '');
